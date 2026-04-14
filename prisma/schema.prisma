@@ -1,0 +1,312 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  COACH
+  ATHLETE
+  ADMIN
+}
+
+enum BlockStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum SessionStatus {
+  PLANNED
+  COMPLETED
+  MISSED
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  FILE
+}
+
+enum FeedbackType {
+  SESSION
+  BLOCK
+  GENERAL
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  role      Role     @default(ATHLETE)
+  imageUrl  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  coachProfile   Coach?
+  athleteProfile Athlete?
+
+  @@index([role])
+}
+
+model Coach {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  bio         String?
+  specialty   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  athletes    Athlete[]
+  blocks      Block[]
+  feedbacks   Feedback[]
+  sessionLogs SessionLog[]
+  mediaAssets MediaAsset[]
+  analytics   Analytics[]
+}
+
+model Athlete {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  coachId     String
+  dateOfBirth DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coach       Coach     @relation(fields: [coachId], references: [id], onDelete: Restrict)
+  blocks      Block[]
+  sessionLogs SessionLog[]
+  feedbacks   Feedback[]
+  mediaAssets MediaAsset[]
+  analytics   Analytics[]
+
+  @@index([coachId])
+}
+
+model Block {
+  id          String      @id @default(cuid())
+  coachId     String
+  athleteId   String
+  title       String
+  goal        String?
+  status      BlockStatus @default(DRAFT)
+  startDate   DateTime
+  endDate     DateTime
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  coach       Coach       @relation(fields: [coachId], references: [id], onDelete: Restrict)
+  athlete     Athlete     @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  weeks       Week[]
+  feedbacks   Feedback[]
+  analytics   Analytics[]
+
+  @@index([coachId])
+  @@index([athleteId])
+  @@index([startDate, endDate])
+}
+
+model Week {
+  id         String   @id @default(cuid())
+  blockId    String
+  weekNumber Int
+  startDate  DateTime
+  endDate    DateTime
+  objective  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  block      Block    @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  sessions   Session[]
+
+  @@unique([blockId, weekNumber])
+  @@index([blockId])
+}
+
+model Session {
+  id          String        @id @default(cuid())
+  weekId      String
+  title       String
+  scheduledAt DateTime?
+  status      SessionStatus @default(PLANNED)
+  durationMin Int?
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  week        Week          @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  exercises   Exercise[]
+  logs        SessionLog[]
+  feedbacks   Feedback[]
+  analytics   Analytics[]
+
+  @@index([weekId])
+  @@index([scheduledAt])
+}
+
+model Exercise {
+  id           String   @id @default(cuid())
+  sessionId    String
+  name         String
+  orderIndex   Int
+  instructions String?
+  tempo        String?
+  restSec      Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  session          Session           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  setPrescriptions SetPrescription[]
+  setLogs          SetLog[]
+
+  @@index([sessionId])
+  @@unique([sessionId, orderIndex])
+}
+
+model SetPrescription {
+  id            String   @id @default(cuid())
+  exerciseId    String
+  setNumber     Int
+  reps          Int?
+  targetRpe     Float?
+  targetLoadKg  Float?
+  targetPercent Float?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  exercise      Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@index([exerciseId])
+  @@unique([exerciseId, setNumber])
+}
+
+model SessionLog {
+  id                String   @id @default(cuid())
+  athleteId         String
+  sessionId         String
+  coachReviewerId   String?
+  completedAt       DateTime
+  perceivedExertion Int?
+  readinessScore    Int?
+  bodyweightKg      Float?
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  athlete           Athlete  @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  session           Session  @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  coachReviewer     Coach?   @relation(fields: [coachReviewerId], references: [id], onDelete: SetNull)
+  setLogs           SetLog[]
+  mediaAssets       MediaAsset[]
+  feedbacks         Feedback[]
+  analytics         Analytics[]
+
+  @@index([athleteId])
+  @@index([sessionId])
+  @@index([coachReviewerId])
+  @@unique([athleteId, sessionId, completedAt])
+}
+
+model SetLog {
+  id            String    @id @default(cuid())
+  sessionLogId  String
+  exerciseId    String
+  setNumber     Int
+  repsCompleted Int?
+  loadKg        Float?
+  rpe           Float?
+  velocityMps   Float?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessionLog    SessionLog @relation(fields: [sessionLogId], references: [id], onDelete: Cascade)
+  exercise      Exercise   @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+
+  @@index([sessionLogId])
+  @@index([exerciseId])
+  @@unique([sessionLogId, exerciseId, setNumber])
+}
+
+model Feedback {
+  id           String       @id @default(cuid())
+  coachId      String
+  athleteId    String
+  blockId      String?
+  sessionId    String?
+  sessionLogId String?
+  type         FeedbackType @default(GENERAL)
+  rating       Int?
+  message      String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  coach        Coach        @relation(fields: [coachId], references: [id], onDelete: Restrict)
+  athlete      Athlete      @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  block        Block?       @relation(fields: [blockId], references: [id], onDelete: SetNull)
+  session      Session?     @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  sessionLog   SessionLog?  @relation(fields: [sessionLogId], references: [id], onDelete: SetNull)
+
+  @@index([coachId])
+  @@index([athleteId])
+  @@index([blockId])
+  @@index([sessionId])
+  @@index([sessionLogId])
+}
+
+model MediaAsset {
+  id           String    @id @default(cuid())
+  coachId      String?
+  athleteId    String?
+  sessionLogId String?
+  type         MediaType @default(IMAGE)
+  url          String
+  filename     String?
+  mimeType     String?
+  sizeBytes    Int?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  coach        Coach?     @relation(fields: [coachId], references: [id], onDelete: SetNull)
+  athlete      Athlete?   @relation(fields: [athleteId], references: [id], onDelete: SetNull)
+  sessionLog   SessionLog? @relation(fields: [sessionLogId], references: [id], onDelete: SetNull)
+
+  @@index([coachId])
+  @@index([athleteId])
+  @@index([sessionLogId])
+}
+
+model Analytics {
+  id           String    @id @default(cuid())
+  coachId      String?
+  athleteId    String?
+  blockId      String?
+  sessionId    String?
+  sessionLogId String?
+  metricKey    String
+  metricValue  Float
+  recordedAt   DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+
+  coach        Coach?      @relation(fields: [coachId], references: [id], onDelete: SetNull)
+  athlete      Athlete?    @relation(fields: [athleteId], references: [id], onDelete: SetNull)
+  block        Block?      @relation(fields: [blockId], references: [id], onDelete: SetNull)
+  session      Session?    @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  sessionLog   SessionLog? @relation(fields: [sessionLogId], references: [id], onDelete: SetNull)
+
+  @@index([metricKey, recordedAt])
+  @@index([coachId])
+  @@index([athleteId])
+  @@index([blockId])
+  @@index([sessionId])
+  @@index([sessionLogId])
+}
