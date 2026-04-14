@@ -1,10 +1,9 @@
-import { randomBytes } from "node:crypto";
-
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { validatePassword } from "@/lib/auth";
+import { createSession, setSessionCookie } from "@/lib/session";
 
 const loginSchema = z.object({
   email: z.string().email().trim().toLowerCase(),
@@ -15,10 +14,6 @@ type CoachBio = {
   businessName?: string;
   passwordHash?: string;
 };
-
-function generateSessionToken() {
-  return randomBytes(48).toString("base64url");
-}
 
 function parseCoachBio(raw: string | null): CoachBio {
   if (!raw) return {};
@@ -79,10 +74,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
 
-    const sessionToken = generateSessionToken();
+    const session = await createSession(user.id);
     const response = NextResponse.json(
       {
-        sessionToken,
+        sessionToken: session.token,
         coachId: coach.id,
         businessName: coachBio.businessName ?? user.name ?? "Coach",
         tier: coach.specialty ?? "STARTER",
@@ -91,13 +86,7 @@ export async function POST(request: Request) {
       { status: 200 },
     );
 
-    response.cookies.set("session_token", sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7,
-    });
+    setSessionCookie(response, session.token);
 
     return response;
   } catch {

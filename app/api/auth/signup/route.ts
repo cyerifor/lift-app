@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -8,6 +7,7 @@ import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
+import { createSession, setSessionCookie } from "@/lib/session";
 
 const signupSchema = z.object({
   email: z.string().email().trim().toLowerCase(),
@@ -29,10 +29,6 @@ function extractValidationErrors(error: z.ZodError) {
     path: issue.path.join("."),
     message: issue.message,
   }));
-}
-
-function generateSessionToken() {
-  return randomBytes(48).toString("base64url");
 }
 
 const acceptedImageMimeTypes = new Set(["image/png", "image/jpeg", "image/svg+xml"]);
@@ -153,24 +149,18 @@ export async function POST(request: Request) {
       return { user: createdUser, coach: createdCoach };
     });
 
-    const sessionToken = generateSessionToken();
+    const session = await createSession(user.id);
     const response = NextResponse.json(
       {
         coachId: coach.id,
         businessName: payload.businessName,
         tier: payload.tier,
-        sessionToken,
+        sessionToken: session.token,
       },
       { status: 201 },
     );
 
-    response.cookies.set("session_token", sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7,
-    });
+    setSessionCookie(response, session.token);
 
     response.headers.set("x-user-id", user.id);
     return response;

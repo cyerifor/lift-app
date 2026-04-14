@@ -136,8 +136,22 @@ export async function POST(request: Request) {
             athleteId: athlete.id,
             sessionId: payload.sessionId,
             sessionLogId: payload.sessionLogId,
+            metricKey: "session:volume",
+            metricValue: totalVolume,
+          },
+          {
+            athleteId: athlete.id,
+            sessionId: payload.sessionId,
+            sessionLogId: payload.sessionLogId,
             metricKey: "session:volume_kg_reps",
             metricValue: totalVolume,
+          },
+          {
+            athleteId: athlete.id,
+            sessionId: payload.sessionId,
+            sessionLogId: payload.sessionLogId,
+            metricKey: "session:avgRpe",
+            metricValue: avgRpe ?? 0,
           },
           {
             athleteId: athlete.id,

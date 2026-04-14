@@ -26,11 +26,22 @@ type ActiveBlockResponse = {
   } | null;
 };
 
+type FeedbackItem = {
+  id: string;
+  message: string;
+  rating: number | null;
+  createdAt: string;
+  coachName: string | null;
+  sessionId: string | null;
+  sessionTitle: string | null;
+};
+
 export default function AthleteHomePage() {
   const [athleteId, setAthleteId] = useState("");
   const [blockData, setBlockData] = useState<ActiveBlockResponse["activeBlock"]>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
 
   useEffect(() => {
     const stored = localStorage.getItem("athlete_id") || "";
@@ -56,6 +67,12 @@ export default function AthleteHomePage() {
         return;
       }
       setBlockData(data.activeBlock);
+
+      const feedbackRes = await fetch("/api/athlete/feedback", {
+        headers: { "x-athlete-id": athleteId },
+      });
+      const feedbackData = (await feedbackRes.json()) as { items?: FeedbackItem[] };
+      if (feedbackRes.ok) setFeedback(feedbackData.items || []);
     } catch {
       setError("Network error while loading athlete data.");
     } finally {
@@ -172,6 +189,25 @@ export default function AthleteHomePage() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+              <h2 className="mb-3 font-semibold">Latest coach feedback</h2>
+              {feedback.length === 0 ? (
+                <p className="text-sm text-slate-400">No feedback yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {feedback.map((entry) => (
+                    <div key={entry.id} className="rounded-lg border border-slate-700 bg-slate-950 p-3">
+                      <p className="text-sm text-slate-300">{entry.message}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {entry.sessionTitle || "Session feedback"} • {entry.rating ? `${entry.rating}★` : "No rating"} •{" "}
+                        {new Date(entry.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </>
         )}

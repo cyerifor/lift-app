@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 type AthleteRow = {
@@ -130,6 +131,14 @@ export default function DashboardPage() {
       <div className="mx-auto flex w-full max-w-7xl flex-col md:flex-row">
         <aside className="border-b border-slate-800 bg-slate-900/80 p-6 md:min-h-screen md:w-72 md:border-b-0 md:border-r">
           <div className="mb-8 text-2xl font-bold tracking-tight">Lift.</div>
+          <nav className="mb-6 space-y-2 text-sm">
+            <Link href="/dashboard" className="block rounded px-2 py-1 text-slate-300 hover:bg-slate-800">
+              Athletes
+            </Link>
+            <Link href="/dashboard/reviews" className="block rounded px-2 py-1 text-slate-300 hover:bg-slate-800">
+              Reviews
+            </Link>
+          </nav>
 
           <label className="mb-2 block text-sm text-slate-300">Coach ID (dev)</label>
           <input
@@ -245,10 +254,10 @@ export default function DashboardPage() {
                           )}
                         </td>
                         <td className="py-2 pr-4">
-                          <a
-                            href={`/dashboard/blocks/new?athleteId=${athlete.athleteId}`}
-                            className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
-                          >
+                          <a href={`/dashboard/analytics/${athlete.athleteId}`} className="mr-2 rounded border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">
+                            Analytics
+                          </a>
+                          <a href={`/dashboard/blocks/new?athleteId=${athlete.athleteId}`} className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">
                             + Block
                           </a>
                         </td>

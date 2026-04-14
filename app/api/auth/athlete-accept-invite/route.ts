@@ -1,11 +1,10 @@
-import { randomBytes } from "node:crypto";
-
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
+import { createSession, setSessionCookie } from "@/lib/session";
 
 const acceptInviteSchema = z.object({
   inviteToken: z.string().min(1),
@@ -29,10 +28,6 @@ type CoachBio = {
   businessName?: string;
   logoUrl?: string;
 };
-
-function generateSessionToken() {
-  return randomBytes(48).toString("base64url");
-}
 
 function parseCoachBio(raw: string | null): CoachBio {
   if (!raw) return {};
@@ -161,26 +156,20 @@ export async function POST(request: Request) {
     });
 
     const coachBio = parseCoachBio(invite.coach.bio);
-    const sessionToken = generateSessionToken();
+    const session = await createSession(created.user.id);
 
     const response = NextResponse.json(
       {
         athleteId: created.athlete.id,
         coachId: invite.coachId,
-        sessionToken,
+        sessionToken: session.token,
         businessName: coachBio.businessName ?? invite.coach.user.name ?? "Coach",
         logoUrl: coachBio.logoUrl ?? null,
       },
       { status: 201 },
     );
 
-    response.cookies.set("session_token", sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7,
-    });
+    setSessionCookie(response, session.token);
 
     return response;
   } catch (error) {
