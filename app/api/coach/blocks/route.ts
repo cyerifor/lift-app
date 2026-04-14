@@ -7,10 +7,23 @@ import { requireCoach } from "@/lib/get-coach";
 const createBlockSchema = z.object({
   athleteId: z.string().min(1, "athleteId is required"),
   name: z.string().min(1, "name is required").max(120),
-  lengthWeeks: z.number().int().min(3, "lengthWeeks must be between 3 and 12").max(12),
-  sessionsPerWeek: z.number().int().min(3, "sessionsPerWeek must be between 3 and 5").max(5),
+  blockNumber: z.number().int().min(1).optional(),
+  phase: z.string().min(1).optional(),
+  weekCount: z.number().int().min(3).max(12),
+  sessionsPerWeek: z.number().int().min(3).max(5),
   startDate: z.string().min(1, "startDate is required"),
   notes: z.string().optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
+  sessions: z
+    .array(
+      z.object({
+        sessionNumber: z.number().int().min(1),
+        day: z.string(),
+        name: z.string(),
+        active: z.boolean().optional(),
+      }),
+    )
+    .optional(),
 });
 
 const sessionDayTemplate: Record<number, number[]> = {
@@ -88,7 +101,7 @@ export async function POST(request: Request) {
 
   try {
     const endDate = new Date(parsedStartDate);
-    endDate.setDate(endDate.getDate() + payload.lengthWeeks * 7 - 1);
+    endDate.setDate(endDate.getDate() + payload.weekCount * 7 - 1);
 
     const created = await db.$transaction(async (tx) => {
       const block = await tx.block.create({
@@ -96,6 +109,11 @@ export async function POST(request: Request) {
           coachId: coach.id,
           athleteId: payload.athleteId,
           title: payload.name,
+          blockNumber: payload.blockNumber ?? 1,
+          phase: payload.phase ?? "Accumulation",
+          weekCount: payload.weekCount,
+          sessionsPerWeek: payload.sessionsPerWeek,
+          config: payload.config ? JSON.stringify(payload.config) : null,
           goal: payload.notes ?? null,
           status: "DRAFT",
           startDate: parsedStartDate,
@@ -104,9 +122,16 @@ export async function POST(request: Request) {
         },
       });
 
-      const weekdays = sessionDayTemplate[payload.sessionsPerWeek];
+      const scheduledSessions = payload.sessions?.length
+        ? payload.sessions.filter((session) => session.active !== false)
+        : sessionDayTemplate[payload.sessionsPerWeek].map((weekday, idx) => ({
+            sessionNumber: idx + 1,
+            day: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][weekday],
+            name: `Session ${idx + 1}`,
+            active: true,
+          }));
 
-      for (let i = 0; i < payload.lengthWeeks; i++) {
+      for (let i = 0; i < payload.weekCount; i++) {
         const { start, end } = weekRangeFrom(parsedStartDate, i);
         const week = await tx.week.create({
           data: {
@@ -118,12 +143,23 @@ export async function POST(request: Request) {
           },
         });
 
-        for (const weekday of weekdays) {
-          const scheduledAt = dateFromWeekday(start, weekday);
+        for (const session of scheduledSessions) {
+          const weekdaysLookup: Record<string, number> = {
+            Sunday: 0,
+            Monday: 1,
+            Tuesday: 2,
+            Wednesday: 3,
+            Thursday: 4,
+            Friday: 5,
+            Saturday: 6,
+          };
+          const scheduledAt = dateFromWeekday(start, weekdaysLookup[session.day] ?? 1);
           await tx.session.create({
             data: {
               weekId: week.id,
-              title: `Week ${i + 1} Session`,
+              sessionNumber: session.sessionNumber,
+              dayOfWeek: session.day,
+              title: session.name,
               scheduledAt,
               status: "PLANNED",
               notes: null,
@@ -139,7 +175,7 @@ export async function POST(request: Request) {
       {
         blockId: created.id,
         name: created.title,
-        lengthWeeks: payload.lengthWeeks,
+        weekCount: payload.weekCount,
         sessionsPerWeek: payload.sessionsPerWeek,
         status: created.status,
       },
@@ -150,5 +186,38 @@ export async function POST(request: Request) {
       { error: "Unable to create block", message: "An unexpected error occurred while creating the block." },
       { status: 500 },
     );
+  }
+}
+
+export async function GET(request: Request) {
+  const coach = await requireCoach(request);
+  if (!coach) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const athleteId = searchParams.get("athleteId");
+
+  try {
+    const blocks = await db.block.findMany({
+      where: {
+        coachId: coach.id,
+        ...(athleteId ? { athleteId } : {}),
+      },
+      orderBy: [{ createdAt: "desc" }],
+      include: {
+        athlete: {
+          include: {
+            user: {
+              select: { name: true, email: true },
+            },
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(blocks, { status: 200 });
+  } catch {
+    return NextResponse.json({ error: "Unable to fetch blocks" }, { status: 500 });
   }
 }

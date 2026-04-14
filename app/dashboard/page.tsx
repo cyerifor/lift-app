@@ -7,6 +7,8 @@ type AthleteRow = {
   email: string;
   personalName: string | null;
   createdAt: string;
+  latestBlockId?: string | null;
+  latestBlockName?: string | null;
 };
 
 type PendingInvite = {
@@ -223,6 +225,8 @@ export default function DashboardPage() {
                       <th className="pb-2 pr-4">Name</th>
                       <th className="pb-2 pr-4">Email</th>
                       <th className="pb-2 pr-4">Joined</th>
+                      <th className="pb-2 pr-4">Active block</th>
+                      <th className="pb-2 pr-4">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -231,6 +235,23 @@ export default function DashboardPage() {
                         <td className="py-2 pr-4">{athlete.personalName || "Unnamed athlete"}</td>
                         <td className="py-2 pr-4 text-slate-300">{athlete.email}</td>
                         <td className="py-2 pr-4 text-slate-400">{new Date(athlete.createdAt).toLocaleDateString()}</td>
+                        <td className="py-2 pr-4">
+                          {athlete.latestBlockId ? (
+                            <a href={`/dashboard/blocks/${athlete.latestBlockId}`} className="text-blue-400 hover:text-blue-300">
+                              {athlete.latestBlockName || "View block"}
+                            </a>
+                          ) : (
+                            <span className="text-slate-500">No block</span>
+                          )}
+                        </td>
+                        <td className="py-2 pr-4">
+                          <a
+                            href={`/dashboard/blocks/new?athleteId=${athlete.athleteId}`}
+                            className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                          >
+                            + Block
+                          </a>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

@@ -4,6 +4,8 @@ export type SessionStatus = "PLANNED" | "COMPLETED" | "MISSED";
 export type MediaType = "IMAGE" | "VIDEO" | "FILE";
 export type FeedbackType = "SESSION" | "BLOCK" | "GENERAL";
 export type InviteStatus = "PENDING" | "ACCEPTED" | "EXPIRED";
+export type ProgressionMode = "% Only" | "RPE Only" | "% + RPE";
+export type Trend = "Linear Up" | "Linear Down" | "Wave" | "Flat";
 
 export interface User {
   id: string;

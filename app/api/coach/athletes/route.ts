@@ -22,6 +22,14 @@ export async function GET(request: Request) {
               name: true,
             },
           },
+          blocks: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: {
+              id: true,
+              title: true,
+            },
+          },
         },
       }),
       db.inviteToken.findMany({
@@ -43,6 +51,8 @@ export async function GET(request: Request) {
           email: athlete.user.email,
           personalName: athlete.user.name,
           createdAt: athlete.createdAt,
+          latestBlockId: athlete.blocks[0]?.id ?? null,
+          latestBlockName: athlete.blocks[0]?.title ?? null,
         })),
         pendingInvites: pendingInvites.map((invite) => ({
           inviteId: invite.id,

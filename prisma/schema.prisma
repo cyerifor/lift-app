@@ -75,6 +75,7 @@ model Coach {
   mediaAssets MediaAsset[]
   analytics   Analytics[]
   inviteTokens InviteToken[]
+  exerciseTemplates ExerciseTemplate[]
 }
 
 model Athlete {
@@ -103,6 +104,11 @@ model Block {
   coachId     String
   athleteId   String
   title       String
+  blockNumber Int         @default(1)
+  phase       String?     @default("Accumulation")
+  weekCount   Int         @default(6)
+  sessionsPerWeek Int     @default(4)
+  config      String?
   goal        String?
   status      BlockStatus @default(DRAFT)
   startDate   DateTime
@@ -142,6 +148,8 @@ model Week {
 model Session {
   id          String        @id @default(cuid())
   weekId      String
+  sessionNumber Int         @default(1)
+  dayOfWeek    String?
   title       String
   scheduledAt DateTime?
   status      SessionStatus @default(PLANNED)
@@ -158,12 +166,24 @@ model Session {
 
   @@index([weekId])
   @@index([scheduledAt])
+  @@unique([weekId, sessionNumber])
 }
 
 model Exercise {
   id           String   @id @default(cuid())
   sessionId    String
+  exerciseTemplateId String?
   name         String
+  exerciseType String?  @default("Accessory")
+  mainLift     String?  @default("accessory")
+  category     String?
+  progressionGroup String? @default("accessory")
+  targetSets   Int?     @default(3)
+  repsDisplay  String?
+  rpeDisplay   String?
+  weeklyPercent Float?
+  roundingKg   Float?   @default(2.5)
+  progEligible Boolean  @default(true)
   orderIndex   Int
   instructions String?
   tempo        String?
@@ -172,6 +192,7 @@ model Exercise {
   updatedAt    DateTime @updatedAt
 
   session          Session           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exerciseTemplate ExerciseTemplate? @relation(fields: [exerciseTemplateId], references: [id], onDelete: SetNull)
   setPrescriptions SetPrescription[]
   setLogs          SetLog[]
 
@@ -183,6 +204,10 @@ model SetPrescription {
   id            String   @id @default(cuid())
   exerciseId    String
   setNumber     Int
+  repsDisplay   String?
+  rpeDisplay    String?
+  suggestedLoKg Float?
+  suggestedHiKg Float?
   reps          Int?
   targetRpe     Float?
   targetLoadKg  Float?
@@ -195,6 +220,29 @@ model SetPrescription {
 
   @@index([exerciseId])
   @@unique([exerciseId, setNumber])
+}
+
+model ExerciseTemplate {
+  id               String   @id @default(cuid())
+  coachId          String?
+  name             String
+  mainLift         String
+  category         String
+  progressionGroup String
+  movementPattern  String?
+  equipment        String?
+  tier             Int      @default(1)
+  roundingKg       Float    @default(2.5)
+  progEligible     Boolean  @default(true)
+  isCustom         Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  coach            Coach?   @relation(fields: [coachId], references: [id], onDelete: SetNull)
+  exercises        Exercise[]
+
+  @@index([coachId])
+  @@index([mainLift, category])
 }
 
 model SessionLog {
