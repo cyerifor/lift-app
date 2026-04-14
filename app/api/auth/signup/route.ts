@@ -1,4 +1,6 @@
 import { randomBytes } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
@@ -8,17 +10,16 @@ import { db } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
 
 const signupSchema = z.object({
-  email: z.email().trim().toLowerCase(),
+  email: z.string().email().trim().toLowerCase(),
   password: z
     .string()
     .min(8, "Password must be at least 8 characters long")
     .max(128, "Password cannot exceed 128 characters"),
   personalName: z.string().trim().min(1, "Personal name is required").max(100),
   businessName: z.string().trim().min(1, "Business name is required").max(120),
-  logoUrl: z.url().trim().optional().or(z.literal("")),
   timezone: z.string().trim().min(1, "Timezone is required").max(80),
-  defaultUnits: z.enum(["METRIC", "IMPERIAL"]),
-  tier: z.enum(["FREE", "STARTER", "PRO", "ENTERPRISE"]),
+  defaultUnits: z.enum(["kg", "lb", "METRIC", "IMPERIAL"]),
+  tier: z.enum(["STARTER", "PRO", "SCALE"]),
 });
 
 type SignupInput = z.infer<typeof signupSchema>;
@@ -34,12 +35,72 @@ function generateSessionToken() {
   return randomBytes(48).toString("base64url");
 }
 
+const acceptedImageMimeTypes = new Set(["image/png", "image/jpeg", "image/svg+xml"]);
+
+function getFileExtension(file: File) {
+  if (file.type === "image/png") return ".png";
+  if (file.type === "image/jpeg") return ".jpg";
+  if (file.type === "image/svg+xml") return ".svg";
+
+  const fromName = path.extname(file.name).toLowerCase();
+  if (fromName) return fromName;
+  return ".bin";
+}
+
+async function saveLogoFile(file: File) {
+  const uploadsDir = path.join(process.cwd(), "public", "uploads");
+  await mkdir(uploadsDir, { recursive: true });
+
+  const extension = getFileExtension(file);
+  const fileName = `${Date.now()}-${randomBytes(8).toString("hex")}${extension}`;
+  const filePath = path.join(uploadsDir, fileName);
+  const fileBuffer = Buffer.from(await file.arrayBuffer());
+
+  await writeFile(filePath, fileBuffer);
+  return `/uploads/${fileName}`;
+}
+
 export async function POST(request: Request) {
   let payload: SignupInput;
+  let normalizedLogoUrl: string | null = null;
 
   try {
-    const body = await request.json();
-    payload = signupSchema.parse(body);
+    const body = await request.formData();
+    payload = signupSchema.parse({
+      email: body.get("email"),
+      password: body.get("password"),
+      personalName: body.get("personalName"),
+      businessName: body.get("businessName"),
+      timezone: body.get("timezone"),
+      defaultUnits: body.get("defaultUnits"),
+      tier: body.get("tier"),
+    });
+
+    const logo = body.get("logo");
+    if (logo instanceof File && logo.size > 0) {
+      if (!acceptedImageMimeTypes.has(logo.type)) {
+        return NextResponse.json(
+          {
+            error: "Validation failed",
+            details: [{ path: "logo", message: "Logo must be a PNG, JPG, or SVG image." }],
+          },
+          { status: 400 },
+        );
+      }
+
+      const maxSizeBytes = 5 * 1024 * 1024;
+      if (logo.size > maxSizeBytes) {
+        return NextResponse.json(
+          {
+            error: "Validation failed",
+            details: [{ path: "logo", message: "Logo file must be smaller than 5MB." }],
+          },
+          { status: 400 },
+        );
+      }
+
+      normalizedLogoUrl = await saveLogoFile(logo);
+    }
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -52,18 +113,13 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(
-      { error: "Invalid request body. Expected JSON payload." },
+      { error: "Invalid request body. Expected multipart/form-data payload." },
       { status: 400 },
     );
   }
 
-  const normalizedLogoUrl = payload.logoUrl && payload.logoUrl.length > 0 ? payload.logoUrl : null;
-
   try {
-    // We hash the password here to satisfy signup security requirements.
-    // Current schema does not include an explicit password hash column on User.
-    // The hash is intentionally not returned in API responses or logs.
-    await hashPassword(payload.password);
+    const passwordHash = await hashPassword(payload.password);
 
     const { user, coach } = await db.$transaction(async (tx) => {
       const createdUser = await tx.user.create({
@@ -82,7 +138,13 @@ export async function POST(request: Request) {
             businessName: payload.businessName,
             logoUrl: normalizedLogoUrl,
             timezone: payload.timezone,
-            defaultUnits: payload.defaultUnits,
+            defaultUnits:
+              payload.defaultUnits === "kg"
+                ? "METRIC"
+                : payload.defaultUnits === "lb"
+                  ? "IMPERIAL"
+                  : payload.defaultUnits,
+            passwordHash,
           }),
           specialty: payload.tier,
         },

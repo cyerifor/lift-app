@@ -68,3 +68,7 @@ export async function validateSession(headers: Headers) {
 export async function hashPassword(password: string) {
   return betterAuthHashPassword(password);
 }
+
+export async function validatePassword(password: string, hash: string) {
+  return verifyPassword({ password, hash });
+}
