@@ -221,3 +221,43 @@ export function generateWeekExercises(
     };
   });
 }
+
+type LoggedSetInput = {
+  weightKg?: number | null;
+  reps?: number | null;
+  rpe?: number | null;
+};
+
+export function bestE1RMFromSets(sets: LoggedSetInput[], slope = -0.0735, rounding = 2.5) {
+  const estimates = sets
+    .filter(
+      (set) =>
+        typeof set.weightKg === "number" &&
+        set.weightKg > 0 &&
+        typeof set.reps === "number" &&
+        set.reps > 0 &&
+        typeof set.rpe === "number" &&
+        set.rpe > 0,
+    )
+    .map((set) => calcE1RM(set.weightKg as number, set.reps as number, set.rpe as number, slope, rounding));
+
+  if (estimates.length === 0) return null;
+  return Math.max(...estimates);
+}
+
+export function sessionVolume(sets: LoggedSetInput[]) {
+  return sets.reduce((sum, set) => {
+    const w = typeof set.weightKg === "number" ? set.weightKg : 0;
+    const r = typeof set.reps === "number" ? set.reps : 0;
+    return sum + w * r;
+  }, 0);
+}
+
+export function averageRpe(sets: LoggedSetInput[]) {
+  const values = sets
+    .map((set) => set.rpe)
+    .filter((rpe): rpe is number => typeof rpe === "number" && Number.isFinite(rpe) && rpe > 0);
+  if (values.length === 0) return null;
+  const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
+  return Number(mean.toFixed(2));
+}
