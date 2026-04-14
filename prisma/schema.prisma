@@ -38,6 +38,12 @@ enum FeedbackType {
   GENERAL
 }
 
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -68,6 +74,7 @@ model Coach {
   sessionLogs SessionLog[]
   mediaAssets MediaAsset[]
   analytics   Analytics[]
+  inviteTokens InviteToken[]
 }
 
 model Athlete {
@@ -86,6 +93,7 @@ model Athlete {
   feedbacks   Feedback[]
   mediaAssets MediaAsset[]
   analytics   Analytics[]
+  inviteTokens InviteToken[]
 
   @@index([coachId])
 }
@@ -309,4 +317,25 @@ model Analytics {
   @@index([blockId])
   @@index([sessionId])
   @@index([sessionLogId])
+}
+
+model InviteToken {
+  id             String   @id @default(cuid())
+  coachId        String
+  athleteId      String?
+  email          String?
+  token          String   @unique
+  sendInviteEmail Boolean @default(false)
+  status         InviteStatus @default(PENDING)
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  coach          Coach    @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  athlete        Athlete? @relation(fields: [athleteId], references: [id], onDelete: SetNull)
+
+  @@index([coachId])
+  @@index([email])
+  @@index([athleteId])
 }

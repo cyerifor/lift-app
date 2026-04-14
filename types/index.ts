@@ -3,6 +3,7 @@ export type BlockStatus = "DRAFT" | "ACTIVE" | "COMPLETED" | "ARCHIVED";
 export type SessionStatus = "PLANNED" | "COMPLETED" | "MISSED";
 export type MediaType = "IMAGE" | "VIDEO" | "FILE";
 export type FeedbackType = "SESSION" | "BLOCK" | "GENERAL";
+export type InviteStatus = "PENDING" | "ACCEPTED" | "EXPIRED";
 
 export interface User {
   id: string;

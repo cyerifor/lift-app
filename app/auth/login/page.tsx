@@ -26,7 +26,12 @@ export default function LoginPage() {
         }),
       });
 
-      const data = (await response.json()) as { error?: string; message?: string; sessionToken?: string };
+      const data = (await response.json()) as {
+        error?: string;
+        message?: string;
+        sessionToken?: string;
+        coachId?: string;
+      };
       if (!response.ok) {
         setError(data.error || data.message || "Login failed. Please try again.");
         return;
@@ -38,6 +43,9 @@ export default function LoginPage() {
       }
 
       localStorage.setItem("session_token", data.sessionToken);
+      if (data.coachId) {
+        localStorage.setItem("coach_id", data.coachId);
+      }
       router.push("/dashboard");
     } catch {
       setError("Network error. Please check your connection and try again.");
