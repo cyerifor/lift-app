@@ -21,8 +21,8 @@ When documents overlap, use this order:
 
 ## Seed data
 
-- `data/powercoach/seed/exercises.json` - 117 extracted exercises
-- `data/powercoach/seed/exercises.csv` - same library for human review
+- `data/powercoach/seed/exercises.manifest.json` - manifest for all 117 extracted exercises
+- `data/powercoach/seed/exercises.part1.json` through `exercises.part4.json` - complete exercise seed library
 - `data/powercoach/seed/drills.json` - 13 prep drills
 - `data/powercoach/seed/rpe-grid.json` - authoritative PowerCoach RPE grid
 - `data/powercoach/seed/engine-options.json` - workbook option lists used as product vocabulary
