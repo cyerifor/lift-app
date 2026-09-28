@@ -59,8 +59,7 @@ In particular, do not keep two competing authentication systems. Audit the curre
 ## Seed and migration material
 
 Current extracted seed data:
-- `data/powercoach/seed/exercises.json`
-- `data/powercoach/seed/exercises.csv`
+- `data/powercoach/seed/exercises.manifest.json` plus the four `exercises.part*.json` files listed in it, containing 117 exercises in total
 - `data/powercoach/seed/drills.json`
 - `data/powercoach/seed/rpe-grid.json`
 - `data/powercoach/seed/engine-options.json`
