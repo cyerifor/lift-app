@@ -1,4 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
 import path from "node:path";
 
 import { Prisma } from "@prisma/client";
@@ -6,8 +7,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
-import { hashPassword } from "@/lib/auth";
-import { createSession, setSessionCookie } from "@/lib/session";
+import { auth } from "@/lib/auth";
 
 const signupSchema = z.object({
   email: z.string().email().trim().toLowerCase(),
@@ -115,54 +115,48 @@ export async function POST(request: Request) {
   }
 
   try {
-    const passwordHash = await hashPassword(payload.password);
+    const signup = await auth.api.signUpEmail({
+      body: {
+        email: payload.email,
+        password: payload.password,
+        name: payload.personalName,
+        image: normalizedLogoUrl ?? undefined,
+      },
+      headers: request.headers,
+      returnHeaders: true,
+    });
 
-    const { user, coach } = await db.$transaction(async (tx) => {
-      const createdUser = await tx.user.create({
-        data: {
-          email: payload.email,
-          name: payload.personalName,
-          role: "COACH",
-          imageUrl: normalizedLogoUrl,
-        },
-      });
-
+    const coach = await db.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: signup.response.user.id }, data: { role: "COACH" } });
       const createdCoach = await tx.coach.create({
         data: {
-          userId: createdUser.id,
+          userId: signup.response.user.id,
           bio: JSON.stringify({
             businessName: payload.businessName,
             logoUrl: normalizedLogoUrl,
-            timezone: payload.timezone,
-            defaultUnits:
-              payload.defaultUnits === "kg"
-                ? "METRIC"
-                : payload.defaultUnits === "lb"
-                  ? "IMPERIAL"
-                  : payload.defaultUnits,
-            passwordHash,
           }),
           specialty: payload.tier,
         },
       });
-
-      return { user: createdUser, coach: createdCoach };
+      await tx.userSettings.create({
+        data: {
+          userId: signup.response.user.id,
+          displayName: payload.personalName,
+          timezone: payload.timezone,
+          displayUnits: payload.defaultUnits === "lb" || payload.defaultUnits === "IMPERIAL" ? "IMPERIAL" : "METRIC",
+        },
+      });
+      return createdCoach;
     });
-
-    const session = await createSession(user.id);
     const response = NextResponse.json(
       {
         coachId: coach.id,
         businessName: payload.businessName,
         tier: payload.tier,
-        sessionToken: session.token,
       },
       { status: 201 },
     );
-
-    setSessionCookie(response, session.token);
-
-    response.headers.set("x-user-id", user.id);
+    signup.headers.forEach((value, key) => response.headers.append(key, value));
     return response;
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {

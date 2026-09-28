@@ -1,4 +1,12 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+This is the Lift App chassis being evolved into PowerCoach.
+
+## Database and authentication
+
+The application uses Prisma with Supabase-hosted PostgreSQL and Better Auth
+(Supabase Auth is not used). Copy `.env.example` to `.env.local`, provide a
+pooled runtime `DATABASE_URL`, a direct migration `DIRECT_URL`, and the Better
+Auth URL/secret. See `docs/powercoach/M1_DATABASE_RUNBOOK.md` for deployment and
+migration details.
 
 ## Getting Started
 

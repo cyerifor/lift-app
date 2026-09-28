@@ -3,8 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
-import { hashPassword } from "@/lib/auth";
-import { createSession, setSessionCookie } from "@/lib/session";
+import { auth } from "@/lib/auth";
 
 const acceptInviteSchema = z.object({
   inviteToken: z.string().min(1),
@@ -96,7 +95,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const passwordHash = await hashPassword(payload.password);
     const dateOfBirth = new Date(payload.dob);
     if (Number.isNaN(dateOfBirth.getTime())) {
       return NextResponse.json(
@@ -113,18 +111,15 @@ export async function POST(request: Request) {
       );
     }
 
+    const signup = await auth.api.signUpEmail({
+      body: { email: payload.email, password: payload.password, name: payload.personalName },
+      headers: request.headers,
+      returnHeaders: true,
+    });
     const created = await db.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          email: payload.email,
-          name: payload.personalName,
-          role: "ATHLETE",
-        },
-      });
-
       const athlete = await tx.athlete.create({
         data: {
-          userId: user.id,
+          userId: signup.response.user.id,
           coachId: invite.coachId,
           dateOfBirth,
           notes: JSON.stringify({
@@ -138,8 +133,15 @@ export async function POST(request: Request) {
             trainingAge: payload.trainingAge,
             injuries: payload.injuries || null,
             notes: payload.notes || null,
-            passwordHash,
           }),
+        },
+      });
+
+      await tx.userSettings.create({
+        data: {
+          userId: signup.response.user.id,
+          displayName: payload.personalName,
+          bodyweightKg: payload.bodyweight,
         },
       });
 
@@ -152,24 +154,21 @@ export async function POST(request: Request) {
         },
       });
 
-      return { user, athlete };
+      return { athlete };
     });
 
     const coachBio = parseCoachBio(invite.coach.bio);
-    const session = await createSession(created.user.id);
-
     const response = NextResponse.json(
       {
         athleteId: created.athlete.id,
         coachId: invite.coachId,
-        sessionToken: session.token,
         businessName: coachBio.businessName ?? invite.coach.user.name ?? "Coach",
         logoUrl: coachBio.logoUrl ?? null,
       },
       { status: 201 },
     );
 
-    setSessionCookie(response, session.token);
+    signup.headers.forEach((value, key) => response.headers.append(key, value));
 
     return response;
   } catch (error) {

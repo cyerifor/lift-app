@@ -168,7 +168,7 @@ export default function SignupPage() {
         body: payload,
       });
 
-      const data = (await response.json()) as { sessionToken?: string; error?: string; message?: string };
+      const data = (await response.json()) as { error?: string; message?: string };
 
       if (!response.ok) {
         const message = data.error || data.message || "Unable to create account. Please try again.";
@@ -176,12 +176,6 @@ export default function SignupPage() {
         return;
       }
 
-      if (!data.sessionToken) {
-        setSubmitError("Signup succeeded but no session token was returned.");
-        return;
-      }
-
-      localStorage.setItem("session_token", data.sessionToken);
       router.push("/dashboard");
     } catch {
       setSubmitError("Network error. Please check your connection and try again.");

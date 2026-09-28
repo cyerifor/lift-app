@@ -42,7 +42,6 @@ export default function SessionLoggingPage() {
   const params = useParams<{ sessionId: string }>();
   const router = useRouter();
   const sessionId = params.sessionId;
-  const [athleteId, setAthleteId] = useState("");
   const [sessionLogId, setSessionLogId] = useState("");
   const [sessionData, setSessionData] = useState<SessionResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -58,17 +57,12 @@ export default function SessionLoggingPage() {
   const elapsedSec = Math.floor((now - startedAt) / 1000);
 
   useEffect(() => {
-    const id = localStorage.getItem("athlete_id") || "";
-    setAthleteId(id);
-  }, []);
-
-  useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
-    if (!sessionId || !athleteId) return;
+    if (!sessionId) return;
     const draftRaw = localStorage.getItem(keyFor(sessionId));
     if (draftRaw) {
       try {
@@ -80,7 +74,7 @@ export default function SessionLoggingPage() {
         // Ignore malformed drafts and continue.
       }
     }
-  }, [sessionId, athleteId]);
+  }, [sessionId]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -88,7 +82,7 @@ export default function SessionLoggingPage() {
   }, [sessionId, sets, bodyweightKg, readiness]);
 
   useEffect(() => {
-    if (!sessionId || !athleteId) return;
+    if (!sessionId) return;
 
     async function boot() {
       setIsLoading(true);
@@ -96,7 +90,7 @@ export default function SessionLoggingPage() {
       try {
         const startRes = await fetch("/api/session-logs/start", {
           method: "POST",
-          headers: { "Content-Type": "application/json", "x-athlete-id": athleteId },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             sessionId,
             bodyweightKg: bodyweightKg ? Number(bodyweightKg) : undefined,
@@ -111,7 +105,7 @@ export default function SessionLoggingPage() {
         setSessionLogId(startJson.sessionLogId);
 
         const detailRes = await fetch(`/api/athlete/sessions/${sessionId}`, {
-          headers: { "x-athlete-id": athleteId },
+
         });
         const detailJson = (await detailRes.json()) as SessionResponse & { error?: string };
         if (!detailRes.ok) {
@@ -142,7 +136,7 @@ export default function SessionLoggingPage() {
 
     void boot();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, athleteId]);
+  }, [sessionId]);
 
   const preparedSets = useMemo(() => {
     if (!sessionData) return [];
@@ -161,13 +155,13 @@ export default function SessionLoggingPage() {
   }, [sessionData, sets]);
 
   async function finishSession() {
-    if (!sessionLogId || !sessionId || !athleteId) return;
+    if (!sessionLogId || !sessionId) return;
     setIsSaving(true);
     setError("");
     try {
       const response = await fetch("/api/session-logs/sync", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-athlete-id": athleteId },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionLogId,
           sessionId,

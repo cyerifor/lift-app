@@ -17,7 +17,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/auth/login", {
+      const response = await fetch("/api/auth/sign-in/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -29,23 +29,12 @@ export default function LoginPage() {
       const data = (await response.json()) as {
         error?: string;
         message?: string;
-        sessionToken?: string;
-        coachId?: string;
       };
       if (!response.ok) {
         setError(data.error || data.message || "Login failed. Please try again.");
         return;
       }
 
-      if (!data.sessionToken) {
-        setError("Login succeeded but no session token was returned.");
-        return;
-      }
-
-      localStorage.setItem("session_token", data.sessionToken);
-      if (data.coachId) {
-        localStorage.setItem("coach_id", data.coachId);
-      }
       router.push("/dashboard");
     } catch {
       setError("Network error. Please check your connection and try again.");

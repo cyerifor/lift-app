@@ -1,5 +1,4 @@
 import { prismaAdapter } from "@better-auth/prisma-adapter";
-import { hashPassword as betterAuthHashPassword, verifyPassword } from "better-auth/crypto";
 import { betterAuth } from "better-auth";
 
 import { db } from "@/lib/db";
@@ -7,16 +6,14 @@ import { db } from "@/lib/db";
 export type AppRole = "COACH" | "ATHLETE";
 
 export const auth = betterAuth({
-  appName: "Lift App",
+  appName: "PowerCoach",
+  secret: process.env.BETTER_AUTH_SECRET,
+  baseURL: process.env.BETTER_AUTH_URL,
   database: prismaAdapter(db, {
     provider: "postgresql",
   }),
   emailAndPassword: {
     enabled: true,
-    password: {
-      hash: betterAuthHashPassword,
-      verify: verifyPassword,
-    },
   },
   user: {
     additionalFields: {
@@ -29,11 +26,15 @@ export const auth = betterAuth({
     },
   },
   session: {
+    modelName: "SessionAccount",
     // 7 days
     expiresIn: 60 * 60 * 24 * 7,
     // Refresh session age daily
     updateAge: 60 * 60 * 24,
   },
+  trustedOrigins: process.env.BETTER_AUTH_TRUSTED_ORIGINS?.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
 });
 
 type CreateSessionArgs = {
@@ -63,12 +64,4 @@ export async function validateSession(headers: Headers) {
   return auth.api.getSession({
     headers,
   });
-}
-
-export async function hashPassword(password: string) {
-  return betterAuthHashPassword(password);
-}
-
-export async function validatePassword(password: string, hash: string) {
-  return verifyPassword({ password, hash });
 }

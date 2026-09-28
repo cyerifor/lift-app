@@ -30,15 +30,14 @@ function Polyline({ data, color }: { data: Point[]; color: string }) {
 
 export default function AthleteAnalyticsPage() {
   const params = useParams<{ athleteId: string }>();
-  const [coachId] = useState(() => (typeof window === "undefined" ? "" : localStorage.getItem("coach_id") || ""));
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!coachId || !params.athleteId) return;
+    if (!params.athleteId) return;
     async function load() {
       const response = await fetch(`/api/coach/analytics/${params.athleteId}`, {
-        headers: { "x-coach-id": coachId },
+
       });
       const json = (await response.json()) as Data & { error?: string };
       if (!response.ok) {
@@ -48,7 +47,7 @@ export default function AthleteAnalyticsPage() {
       setData(json);
     }
     void load();
-  }, [coachId, params.athleteId]);
+  }, [params.athleteId]);
 
   const adherenceAvg = useMemo(() => {
     if (!data || data.weeklyAdherence.length === 0) return 0;

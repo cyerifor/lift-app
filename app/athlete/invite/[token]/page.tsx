@@ -129,16 +129,11 @@ export default function AthleteInvitePage() {
           notes: form.notes,
         }),
       });
-      const data = (await response.json()) as { sessionToken?: string; error?: string; message?: string };
+      const data = (await response.json()) as { error?: string; message?: string };
       if (!response.ok) {
         setSubmitError(data.error || data.message || "Unable to accept invite.");
         return;
       }
-      if (!data.sessionToken) {
-        setSubmitError("No session token returned.");
-        return;
-      }
-      localStorage.setItem("session_token", data.sessionToken);
       setCompleted(true);
       setStep(3);
     } catch {
