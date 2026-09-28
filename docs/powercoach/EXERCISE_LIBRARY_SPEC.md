@@ -12,10 +12,10 @@ The programme builder reads live active exercises from this library.
 
 Files:
 
-- `data/powercoach/seed/exercises.json`
-- `data/powercoach/seed/exercises.csv`
+- `data/powercoach/seed/exercises.manifest.json`
+- `data/powercoach/seed/exercises.part1.json` through `exercises.part4.json`
 
-The seed is an exact extraction of the workbook's useful exercise fields. Some legacy metadata is questionable and should be reviewable in the UI rather than silently "corrected" during import.
+The manifest and four part files together contain all 117 extracted exercises. The seed is an exact extraction of the workbook's useful exercise fields. Some legacy metadata is questionable and should be reviewable in the UI rather than silently "corrected" during import.
 
 Current seed summary:
 
