@@ -45,9 +45,15 @@ backups and point-in-time recovery policy must be selected before production
 launch. Roll application code back independently; use forward migrations for
 database correction rather than editing an already-applied migration.
 
-The normal unit suite never falls back to SQLite. The dedicated PostgreSQL gate
-fails immediately when `TEST_DATABASE_URL` is missing, applies and checks the
-migrations, then runs the auth integration suite against that database:
+Both test commands use Node's test runner with `tsx` to load TypeScript,
+Next.js modules and the application's `@/` aliases from `tsconfig.json`.
+`npm test` runs the unit tests in `tests/*.test.ts`; the PostgreSQL integration
+suite lives separately in `tests/integration/` so it is not run twice in CI.
+
+The dedicated PostgreSQL gate fails immediately when `TEST_DATABASE_URL` is
+missing, applies and checks the migrations, then runs the auth integration suite
+against that database. The suite also fails if invoked directly without its test
+database URL; it never skips or falls back to SQLite:
 
 ```sh
 TEST_DATABASE_URL="postgresql://.../isolated_test_database" npm run test:postgres

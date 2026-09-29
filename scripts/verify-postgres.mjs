@@ -24,8 +24,7 @@ run(process.execPath, ["node_modules/prisma/build/index.js", "migrate", "deploy"
 run(process.execPath, ["node_modules/prisma/build/index.js", "migrate", "status"]);
 run(process.execPath, [
   "--import",
-  "./scripts/register-test-resolver.mjs",
-  "--experimental-strip-types",
+  "tsx",
   "--test",
-  "tests/auth-postgres.integration.test.ts",
+  "tests/integration/auth-postgres.test.ts",
 ]);

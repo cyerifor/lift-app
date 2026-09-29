@@ -12,19 +12,20 @@ function cookieHeader(response: Response) {
 
 test(
   "Better Auth signup, me, sign-out invalidation, sign-in, and invited athlete session work on PostgreSQL",
-  { skip: !databaseUrl, timeout: 30_000 },
+  { timeout: 30_000 },
   async () => {
+    assert.ok(databaseUrl, "TEST_DATABASE_URL is required for the PostgreSQL M1A integration suite.");
     process.env.DATABASE_URL = databaseUrl;
     process.env.DIRECT_URL = databaseUrl;
     process.env.BETTER_AUTH_SECRET ??= "integration-test-secret-at-least-32-characters";
     process.env.BETTER_AUTH_URL ??= "http://localhost:3000";
 
     const [{ db }, coachSignup, athleteSignup, meRoute, authRoute] = await Promise.all([
-      import("../lib/db.ts"),
-      import("../app/api/auth/signup/route.ts"),
-      import("../app/api/auth/athlete-accept-invite/route.ts"),
-      import("../app/api/auth/me/route.ts"),
-      import("../app/api/auth/[...all]/route.ts"),
+      import("@/lib/db"),
+      import("@/app/api/auth/signup/route"),
+      import("@/app/api/auth/athlete-accept-invite/route"),
+      import("@/app/api/auth/me/route"),
+      import("@/app/api/auth/[...all]/route"),
     ]);
 
     const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
