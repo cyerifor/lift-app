@@ -37,16 +37,10 @@ type FeedbackItem = {
 };
 
 export default function AthleteHomePage() {
-  const [athleteId, setAthleteId] = useState("");
   const [blockData, setBlockData] = useState<ActiveBlockResponse["activeBlock"]>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("athlete_id") || "";
-    setAthleteId(stored);
-  }, []);
 
   const totalSessions = useMemo(
     () => blockData?.weeks.reduce((sum, week) => sum + week.sessions.length, 0) ?? 0,
@@ -54,12 +48,11 @@ export default function AthleteHomePage() {
   );
 
   async function loadActiveBlock() {
-    if (!athleteId) return;
     setIsLoading(true);
     setError("");
     try {
       const response = await fetch("/api/athlete/blocks/active", {
-        headers: { "x-athlete-id": athleteId },
+
       });
       const data = (await response.json()) as ActiveBlockResponse & { error?: string };
       if (!response.ok) {
@@ -69,7 +62,7 @@ export default function AthleteHomePage() {
       setBlockData(data.activeBlock);
 
       const feedbackRes = await fetch("/api/athlete/feedback", {
-        headers: { "x-athlete-id": athleteId },
+
       });
       const feedbackData = (await feedbackRes.json()) as { items?: FeedbackItem[] };
       if (feedbackRes.ok) setFeedback(feedbackData.items || []);
@@ -80,6 +73,10 @@ export default function AthleteHomePage() {
     }
   }
 
+  useEffect(() => {
+    void loadActiveBlock();
+  }, []);
+
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-8 text-white">
       <div className="mx-auto w-full max-w-5xl space-y-6">
@@ -88,23 +85,7 @@ export default function AthleteHomePage() {
             <h1 className="text-2xl font-semibold">Athlete Home</h1>
             <p className="text-sm text-slate-400">Track active block progress and launch your next session.</p>
           </div>
-          <div className="flex w-full gap-2 sm:w-auto">
-            <input
-              value={athleteId}
-              onChange={(e) => setAthleteId(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm sm:w-72"
-              placeholder="Athlete ID (dev)"
-            />
-            <button
-              onClick={() => {
-                localStorage.setItem("athlete_id", athleteId);
-                void loadActiveBlock();
-              }}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium hover:bg-blue-500"
-            >
-              Load
-            </button>
-          </div>
+          <button onClick={() => void loadActiveBlock()} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium hover:bg-blue-500">Refresh</button>
         </header>
 
         {error && <div className="rounded-lg border border-red-900 bg-red-950/30 p-3 text-sm text-red-300">{error}</div>}

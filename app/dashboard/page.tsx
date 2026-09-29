@@ -34,7 +34,6 @@ const tierCapacity: Record<string, number> = {
 };
 
 export default function DashboardPage() {
-  const [coachId, setCoachId] = useState("");
   const [coachTier, setCoachTier] = useState<"STARTER" | "PRO" | "SCALE">("STARTER");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteUrl, setInviteUrl] = useState("");
@@ -43,11 +42,6 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isInviting, setIsInviting] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    const storedCoachId = localStorage.getItem("coach_id") || "";
-    setCoachId(storedCoachId);
-  }, []);
 
   const capacityLimit = tierCapacity[coachTier];
   const rosterCount = athletes.length;
@@ -60,16 +54,10 @@ export default function DashboardPage() {
   }, [capacityLimit, rosterCount, pendingInvites.length]);
 
   async function loadCoachData() {
-    if (!coachId) return;
-
     setIsLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/coach/athletes", {
-        headers: {
-          "x-coach-id": coachId,
-        },
-      });
+      const response = await fetch("/api/coach/athletes");
       const data = (await response.json()) as AthletesResponse & { error?: string };
       if (!response.ok) {
         setError(data.error || "Unable to load dashboard data.");
@@ -85,12 +73,11 @@ export default function DashboardPage() {
     }
   }
 
-  async function generateInvite() {
-    if (!coachId) {
-      setError("Coach ID is required.");
-      return;
-    }
+  useEffect(() => {
+    void loadCoachData();
+  }, []); // Authentication is resolved by the server cookie.
 
+  async function generateInvite() {
     setIsInviting(true);
     setError("");
     setInviteUrl("");
@@ -100,7 +87,6 @@ export default function DashboardPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-coach-id": coachId,
         },
         body: JSON.stringify({
           email: inviteEmail.trim().toLowerCase() || undefined,
@@ -139,14 +125,6 @@ export default function DashboardPage() {
               Reviews
             </Link>
           </nav>
-
-          <label className="mb-2 block text-sm text-slate-300">Coach ID (dev)</label>
-          <input
-            value={coachId}
-            onChange={(event) => setCoachId(event.target.value)}
-            className="mb-3 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
-            placeholder="Paste coach ID"
-          />
 
           <label className="mb-2 block text-sm text-slate-300">Tier</label>
           <select

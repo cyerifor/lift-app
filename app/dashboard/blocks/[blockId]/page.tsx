@@ -10,6 +10,8 @@ type SetPrescription = {
   reps: number | null;
   targetRpe: number | null;
   targetLoadKg: number | null;
+  suggestedLoKg?: number | null;
+  suggestedHiKg?: number | null;
 };
 
 type Exercise = {
@@ -67,7 +69,6 @@ type ExerciseTemplate = {
 export default function BlockBuilderPage() {
   const { blockId } = useParams<{ blockId: string }>();
 
-  const [coachId, setCoachId] = useState("");
   const [block, setBlock] = useState<BlockOutline | null>(null);
   const [exerciseLibrary, setExerciseLibrary] = useState<ExerciseTemplate[]>([]);
   const [activeWeek, setActiveWeek] = useState(1);
@@ -78,28 +79,15 @@ export default function BlockBuilderPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const storedCoachId = localStorage.getItem("coach_id") || "";
-    setCoachId(storedCoachId);
-  }, []);
-
-  useEffect(() => {
     async function loadBlockAndLibrary() {
-      if (!coachId || !blockId) return;
+      if (!blockId) return;
 
       setIsLoading(true);
       setError("");
       try {
         const [blockResponse, libraryResponse] = await Promise.all([
-          fetch(`/api/coach/blocks/${blockId}`, {
-            headers: {
-              "x-coach-id": coachId,
-            },
-          }),
-          fetch("/api/coach/exercise-library", {
-            headers: {
-              "x-coach-id": coachId,
-            },
-          }),
+          fetch(`/api/coach/blocks/${blockId}`),
+          fetch("/api/coach/exercise-library"),
         ]);
 
         const data = (await blockResponse.json()) as BlockOutline & { error?: string };
@@ -123,7 +111,7 @@ export default function BlockBuilderPage() {
     }
 
     void loadBlockAndLibrary();
-  }, [coachId, blockId]);
+  }, [blockId]);
 
   const totalSessions = useMemo(() => block?.weeks.reduce((sum, week) => sum + week.sessions.length, 0) ?? 0, [block]);
   const currentWeek = block?.weeks.find((week) => week.weekNumber === activeWeek) ?? null;
@@ -169,7 +157,7 @@ export default function BlockBuilderPage() {
   }
 
   async function saveWeek1() {
-    if (!block || !coachId) return;
+    if (!block) return;
     const week1 = block.weeks.find((week) => week.weekNumber === 1);
     if (!week1) return;
 
@@ -180,7 +168,6 @@ export default function BlockBuilderPage() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          "x-coach-id": coachId,
         },
         body: JSON.stringify({
           weekNumber: 1,
@@ -221,20 +208,19 @@ export default function BlockBuilderPage() {
   }
 
   async function generateBlockWeeks() {
-    if (!coachId) return;
     setIsGenerating(true);
     setError("");
     try {
       const response = await fetch(`/api/coach/blocks/${blockId}`, {
         method: "POST",
-        headers: { "x-coach-id": coachId },
+
       });
       const data = (await response.json()) as { error?: string };
       if (!response.ok) {
         setError(data.error || "Unable to generate weeks.");
         return;
       }
-      const refreshed = await fetch(`/api/coach/blocks/${blockId}`, { headers: { "x-coach-id": coachId } });
+      const refreshed = await fetch(`/api/coach/blocks/${blockId}`);
       const refreshedData = (await refreshed.json()) as BlockOutline;
       if (refreshed.ok) setBlock(refreshedData);
     } catch {
@@ -270,12 +256,6 @@ export default function BlockBuilderPage() {
             </button>
           </div>
         </div>
-
-        {!coachId && (
-          <div className="mb-4 rounded-lg border border-amber-900 bg-amber-950/30 p-3 text-sm text-amber-300">
-            Missing coach id in localStorage. Sign in again from `/auth/login`.
-          </div>
-        )}
 
         {error && (
           <div className="mb-4 rounded-lg border border-red-900 bg-red-950/30 p-3 text-sm text-red-300">{error}</div>

@@ -23,7 +23,6 @@ type ReviewDetail = {
 
 export default function ReviewDetailPage() {
   const params = useParams<{ logId: string }>();
-  const [coachId] = useState(() => (typeof window === "undefined" ? "" : localStorage.getItem("coach_id") || ""));
   const [detail, setDetail] = useState<ReviewDetail | null>(null);
   const [rating, setRating] = useState(5);
   const [message, setMessage] = useState("");
@@ -31,10 +30,10 @@ export default function ReviewDetailPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!coachId || !params.logId) return;
+    if (!params.logId) return;
     async function load() {
       const response = await fetch(`/api/coach/reviews/${params.logId}`, {
-        headers: { "x-coach-id": coachId },
+
       });
       const data = (await response.json()) as ReviewDetail & { error?: string };
       if (!response.ok) {
@@ -44,7 +43,7 @@ export default function ReviewDetailPage() {
       setDetail(data);
     }
     void load();
-  }, [coachId, params.logId]);
+  }, [params.logId]);
 
   async function submitFeedback() {
     if (!detail) return;
@@ -54,7 +53,6 @@ export default function ReviewDetailPage() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-coach-id": coachId,
       },
       body: JSON.stringify({
         athleteId: detail.athlete.id,
