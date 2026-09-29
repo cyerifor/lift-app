@@ -16,6 +16,7 @@ test(
     ]);
     const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const users: string[] = [];
+    let referenceBlockId: string | null = null;
     const service = new ExerciseService(db);
 
     try {
@@ -71,6 +72,7 @@ test(
           endDate: new Date("2026-02-01"),
         },
       });
+      referenceBlockId = block.id;
       const week = await db.week.create({
         data: { blockId: block.id, weekNumber: 1, startDate: block.startDate, endDate: block.endDate },
       });
@@ -90,6 +92,9 @@ test(
       assert.equal((await service.restore(athlete.id, created.id)).active, true);
       await assert.rejects(service.get(otherAthlete.id, created.id), /not found/i);
     } finally {
+      if (referenceBlockId) {
+        await db.block.deleteMany({ where: { id: referenceBlockId } });
+      }
       await db.user.deleteMany({ where: { id: { in: users } } });
       await db.$disconnect();
     }
