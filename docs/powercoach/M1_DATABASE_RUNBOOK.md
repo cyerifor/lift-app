@@ -52,3 +52,8 @@ migrations, then runs the auth integration suite against that database:
 ```sh
 TEST_DATABASE_URL="postgresql://.../isolated_test_database" npm run test:postgres
 ```
+
+Pull requests targeting `powercoach-bootstrap` run the same gate in
+`.github/workflows/powercoach-m1a.yml` against a temporary PostgreSQL 16 service
+database. The workflow requires no Supabase or production credentials and fails
+on migration, auth integration, typecheck, lint, unit-test, or build failures.
