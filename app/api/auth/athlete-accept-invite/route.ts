@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { appendSetCookieHeaders, completeSignup } from "@/lib/auth/signup-flow";
 import { getBetterAuthSignupConflictStatus } from "@/lib/auth/errors";
+import { seedAthleteExercises } from "@/lib/exercises/seed";
 
 const acceptInviteSchema = z.object({
   inviteToken: z.string().min(1),
@@ -149,6 +150,8 @@ export async function POST(request: Request) {
               bodyweightKg: payload.bodyweight,
             },
           });
+
+          await seedAthleteExercises(tx, athlete.id);
 
           await tx.inviteToken.update({
             where: { id: invite.id },

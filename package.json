@@ -10,7 +10,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/*.test.ts",
-    "test:postgres": "node scripts/verify-postgres.mjs"
+    "test:postgres": "node scripts/verify-postgres.mjs",
+    "validate:seeds": "node --import tsx scripts/validate-exercise-seeds.ts"
   },
   "dependencies": {
     "@better-auth/prisma-adapter": "^1.6.3",

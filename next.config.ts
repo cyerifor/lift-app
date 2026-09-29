@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  outputFileTracingIncludes: {
+    "/api/exercises/**/*": ["./data/powercoach/seed/exercises*.json"],
+    "/api/auth/athlete-accept-invite": ["./data/powercoach/seed/exercises*.json"],
+  },
 };
 
 export default nextConfig;
