@@ -127,26 +127,26 @@ export async function PUT(request: Request, { params }: { params: Promise<{ bloc
           },
         });
 
-        const existing = await tx.exercise.findMany({
+        const existing = await tx.exerciseSlot.findMany({
           where: { sessionId: sessionInput.sessionId },
           select: { id: true },
         });
         const keepIds = new Set(sessionInput.exercises.map((e) => e.id).filter(Boolean) as string[]);
         const deleteIds = existing.map((e) => e.id).filter((id) => !keepIds.has(id));
         if (deleteIds.length > 0) {
-          await tx.exercise.deleteMany({ where: { id: { in: deleteIds } } });
+          await tx.exerciseSlot.deleteMany({ where: { id: { in: deleteIds } } });
         }
 
         for (const exercise of sessionInput.exercises) {
           const exerciseId =
             exercise.id ??
             (
-              await tx.exercise.create({
+              await tx.exerciseSlot.create({
                 data: {
                   sessionId: sessionInput.sessionId,
                   name: exercise.name,
                   orderIndex: exercise.orderIndex,
-                  exerciseTemplateId: exercise.exerciseTemplateId ?? null,
+                  exerciseId: exercise.exerciseTemplateId ?? null,
                   exerciseType: exercise.exerciseType,
                   mainLift: exercise.mainLift,
                   category: exercise.category,
@@ -161,12 +161,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ bloc
               })
             ).id;
 
-          await tx.exercise.update({
+          await tx.exerciseSlot.update({
             where: { id: exerciseId },
             data: {
               name: exercise.name,
               orderIndex: exercise.orderIndex,
-              exerciseTemplateId: exercise.exerciseTemplateId ?? null,
+              exerciseId: exercise.exerciseTemplateId ?? null,
               exerciseType: exercise.exerciseType,
               mainLift: exercise.mainLift,
               category: exercise.category,
@@ -254,7 +254,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ blo
         if (week.weekNumber === 1) continue;
 
         for (const session of week.sessions) {
-          await tx.exercise.deleteMany({ where: { sessionId: session.id } });
+          await tx.exerciseSlot.deleteMany({ where: { sessionId: session.id } });
         }
 
         for (const templateSession of week1.sessions) {
@@ -265,7 +265,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ blo
             templateSession.exercises.map(
               (exercise) =>
                 ({
-                  exerciseTemplateId: exercise.exerciseTemplateId,
+                  exerciseTemplateId: exercise.exerciseId,
                   name: exercise.name,
                   mainLift: (exercise.mainLift ?? "accessory") as Week1ExerciseTemplate["mainLift"],
                   category: exercise.category ?? "Hypertrophy Accessory",
@@ -285,12 +285,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ blo
 
           for (let idx = 0; idx < generated.length; idx++) {
             const exercise = generated[idx];
-            const createdExercise = await tx.exercise.create({
+            const createdExercise = await tx.exerciseSlot.create({
               data: {
                 sessionId: targetSession.id,
                 name: exercise.name,
                 orderIndex: idx + 1,
-                exerciseTemplateId: exercise.exerciseTemplateId ?? null,
+                exerciseId: exercise.exerciseTemplateId ?? null,
                 exerciseType: exercise.exerciseType,
                 mainLift: exercise.mainLift,
                 category: exercise.category,

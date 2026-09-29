@@ -1,4 +1,4 @@
-name: PowerCoach M1A
+name: PowerCoach M1
 
 on:
   pull_request:
@@ -13,8 +13,8 @@ permissions:
   contents: read
 
 jobs:
-  verify-m1a:
-    name: PostgreSQL, auth, and application checks
+  verify-m1:
+    name: PostgreSQL, auth, exercise library, and application checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -37,7 +37,7 @@ jobs:
       TEST_DATABASE_URL: postgresql://powercoach:powercoach@localhost:5432/powercoach_test
       DATABASE_URL: postgresql://powercoach:powercoach@localhost:5432/powercoach_test
       DIRECT_URL: postgresql://powercoach:powercoach@localhost:5432/powercoach_test
-      BETTER_AUTH_SECRET: github-actions-m1a-secret-at-least-32-characters
+      BETTER_AUTH_SECRET: github-actions-m1-secret-at-least-32-characters
       BETTER_AUTH_URL: http://localhost:3000
       BETTER_AUTH_TRUSTED_ORIGINS: http://localhost:3000
 
@@ -67,7 +67,10 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
-      - name: Verify PostgreSQL migrations and Better Auth integration
+      - name: Validate Exercise Library seed
+        run: npm run validate:seeds
+
+      - name: Verify PostgreSQL migrations and integration
         run: npm run test:postgres
 
       - name: Typecheck

@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (!databaseUrl) {
-  console.error("TEST_DATABASE_URL is required for the PostgreSQL M1A verification gate.");
+  console.error("TEST_DATABASE_URL is required for the PostgreSQL M1 verification gate.");
   process.exit(1);
 }
 
@@ -27,4 +27,6 @@ run(process.execPath, [
   "tsx",
   "--test",
   "tests/integration/auth-postgres.test.ts",
+  "tests/exercise-api-postgres.integration.ts",
+  "tests/exercise-postgres.integration.ts",
 ]);

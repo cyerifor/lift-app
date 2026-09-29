@@ -87,7 +87,7 @@ export default function BlockBuilderPage() {
       try {
         const [blockResponse, libraryResponse] = await Promise.all([
           fetch(`/api/coach/blocks/${blockId}`),
-          fetch("/api/coach/exercise-library"),
+          fetch(`/api/coach/exercise-library?blockId=${encodeURIComponent(blockId)}`),
         ]);
 
         const data = (await blockResponse.json()) as BlockOutline & { error?: string };
@@ -230,166 +230,101 @@ export default function BlockBuilderPage() {
     }
   }
 
+  if (isLoading) {
+    return <div className="min-h-screen bg-slate-950 p-8 text-slate-300">Loading block builder...</div>;
+  }
+
+  if (!block) {
+    return <div className="min-h-screen bg-slate-950 p-8 text-red-300">{error || "Block not found."}</div>;
+  }
+
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
-      <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <main className="min-h-screen bg-slate-950 px-4 py-8 text-white">
+      <div className="mx-auto w-full max-w-7xl">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm text-slate-400">Block Builder</p>
-            <h1 className="text-2xl font-semibold">{block?.title ?? "Loading block..."}</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/dashboard" className="rounded-lg border border-slate-700 px-3 py-2 text-sm hover:bg-slate-800">
-              Back to dashboard
-            </Link>
-            <button
-              onClick={saveWeek1}
-              className="rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium hover:bg-slate-600"
-            >
-              {isSaving ? "Saving..." : "Save Week 1"}
-            </button>
-            <button
-              onClick={generateBlockWeeks}
-              className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium hover:bg-blue-500"
-            >
-              {isGenerating ? "Generating..." : "Generate Block"}
-            </button>
-          </div>
-        </div>
-
-        {error && (
-          <div className="mb-4 rounded-lg border border-red-900 bg-red-950/30 p-3 text-sm text-red-300">{error}</div>
-        )}
-
-        <div className="mb-6 grid gap-4 sm:grid-cols-3">
-          <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-400">Status</p>
-            <p className="mt-1 text-lg font-semibold">{block?.status ?? "-"}</p>
-          </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-400">Date range</p>
-            <p className="mt-1 text-lg font-semibold">
-              {block ? `${new Date(block.startDate).toLocaleDateString()} - ${new Date(block.endDate).toLocaleDateString()}` : "-"}
+            <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Programme builder</p>
+            <h1 className="text-2xl font-semibold">{block.title}</h1>
+            <p className="text-sm text-slate-400">
+              {new Date(block.startDate).toLocaleDateString()} – {new Date(block.endDate).toLocaleDateString()} · {totalSessions} sessions
             </p>
           </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-400">Sessions</p>
-            <p className="mt-1 text-lg font-semibold">{totalSessions}</p>
+          <div className="flex gap-2">
+            <Link href="/dashboard" className="rounded-lg border border-slate-700 px-3 py-2 text-sm hover:bg-slate-900">Dashboard</Link>
+            <button onClick={saveWeek1} disabled={isSaving} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium hover:bg-blue-500 disabled:opacity-50">
+              {isSaving ? "Saving..." : "Save Week 1"}
+            </button>
+            <button onClick={generateBlockWeeks} disabled={isGenerating} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium hover:bg-emerald-500 disabled:opacity-50">
+              {isGenerating ? "Generating..." : "Generate Weeks"}
+            </button>
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
-          <aside className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
-            <h2 className="mb-3 text-lg font-semibold">Exercise library</h2>
-            <div className="max-h-[70vh] space-y-2 overflow-y-auto pr-1">
-              {exerciseLibrary.map((template) => (
-                <div key={template.id} className="rounded-lg border border-slate-700 bg-slate-950 p-3">
-                  <p className="font-medium">{template.name}</p>
-                  <p className="text-xs text-slate-400">
-                    {template.mainLift} • {template.category}
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {currentWeek?.sessions.map((session) => (
-                      <button
-                        key={`${template.id}-${session.id}`}
-                        onClick={() => addExerciseToSession(session.id, template)}
-                        className="rounded bg-slate-800 px-2 py-1 text-xs hover:bg-slate-700"
-                        title={`Add to ${session.title}`}
-                      >
-                        S{session.sessionNumber}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </aside>
+        {error && <div className="mb-4 rounded-lg border border-red-900 bg-red-950/30 p-3 text-sm text-red-300">{error}</div>}
 
-          <section className="space-y-3">
-            <div className="flex flex-wrap gap-2">
-              {block?.weeks.map((week) => (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {block.weeks.map((week) => (
+            <button
+              key={week.id}
+              onClick={() => setActiveWeek(week.weekNumber)}
+              className={`rounded-lg px-3 py-2 text-sm ${
+                activeWeek === week.weekNumber ? "bg-blue-600" : "border border-slate-700 bg-slate-900 text-slate-300"
+              }`}
+            >
+              Week {week.weekNumber}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+          <section className="space-y-4">
+            {currentWeek?.sessions.map((session) => (
+              <article key={session.id} className={`rounded-2xl border p-4 ${selectedSessionId === session.id ? "border-blue-500 bg-slate-900" : "border-slate-800 bg-slate-900/60"}`}>
+                <button className="mb-3 w-full text-left" onClick={() => setSelectedSessionId(session.id)}>
+                  <div className="flex items-center justify-between gap-2">
+                    <h2 className="font-medium">{session.title}</h2>
+                    <span className="text-xs text-slate-400">{session.dayOfWeek || `Session ${session.sessionNumber}`}</span>
+                  </div>
+                </button>
+                <div className="space-y-2">
+                  {session.exercises.map((exercise) => (
+                    <div key={exercise.id} className="rounded-xl border border-slate-800 bg-slate-950/50 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium">{exercise.name}</p>
+                          <p className="text-xs text-slate-400">
+                            {exercise.targetSets ?? 3} sets · {exercise.repsDisplay || "8-12"} reps · RPE {exercise.rpeDisplay || "7-8"}
+                          </p>
+                        </div>
+                        <span className="text-xs uppercase text-slate-500">{exercise.mainLift || "Accessory"}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {session.exercises.length === 0 && <p className="text-sm text-slate-500">No exercises yet.</p>}
+                </div>
+              </article>
+            ))}
+          </section>
+
+          <aside className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 lg:sticky lg:top-4 lg:h-fit">
+            <h2 className="mb-1 font-medium">Exercise library</h2>
+            <p className="mb-3 text-xs text-slate-400">Add exercises into the selected session.</p>
+            {!selectedSessionId && <p className="text-sm text-amber-300">Select a session first.</p>}
+            <div className="max-h-[70vh] space-y-2 overflow-auto pr-1">
+              {exerciseLibrary.map((template) => (
                 <button
-                  key={week.id}
-                  onClick={() => setActiveWeek(week.weekNumber)}
-                  className={`rounded-lg px-3 py-1.5 text-sm ${
-                    activeWeek === week.weekNumber ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-                  }`}
+                  key={template.id}
+                  type="button"
+                  disabled={!selectedSessionId || activeWeek !== 1}
+                  onClick={() => addExerciseToSession(selectedSessionId, template)}
+                  className="w-full rounded-lg border border-slate-800 px-3 py-2 text-left hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Week {week.weekNumber}
+                  <p className="text-sm font-medium">{template.name}</p>
+                  <p className="text-xs text-slate-500">{template.mainLift} · {template.category}</p>
                 </button>
               ))}
             </div>
-
-            {isLoading && (
-              <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-6 text-slate-300">
-                Loading block structure...
-              </div>
-            )}
-
-            {!isLoading && currentWeek && (
-              <div className="space-y-3">
-                {currentWeek.sessions.map((session) => (
-                  <div
-                    key={session.id}
-                    className={`rounded-xl border ${selectedSessionId === session.id ? "border-blue-500" : "border-slate-800"} bg-slate-900/40`}
-                    onClick={() => setSelectedSessionId(session.id)}
-                  >
-                    <div className="border-b border-slate-800 px-4 py-3">
-                      <h3 className="font-semibold">
-                        S{session.sessionNumber}: {session.title}
-                      </h3>
-                      <p className="text-xs text-slate-500">{session.dayOfWeek || "Unscheduled day"}</p>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[900px] text-left text-sm">
-                        <thead className="text-slate-400">
-                          <tr>
-                            <th className="px-4 py-2">Exercise</th>
-                            <th className="px-4 py-2">Type</th>
-                            <th className="px-4 py-2">Sets</th>
-                            <th className="px-4 py-2">Reps</th>
-                            <th className="px-4 py-2">RPE</th>
-                            <th className="px-4 py-2">Suggested Load</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {session.exercises.length === 0 && (
-                            <tr className="border-t border-slate-800">
-                              <td colSpan={6} className="px-4 py-3 text-slate-400">
-                                No exercises yet. Add from the library panel.
-                              </td>
-                            </tr>
-                          )}
-                          {session.exercises.map((exercise) => {
-                            const typeColor =
-                              exercise.exerciseType === "Top Set"
-                                ? "text-amber-300"
-                                : exercise.exerciseType === "Backdown"
-                                  ? "text-blue-300"
-                                  : "text-slate-300";
-                            const loadRange = exercise.setPrescriptions[0]
-                              ? `${exercise.setPrescriptions[0].suggestedLoKg ?? "-"} - ${exercise.setPrescriptions[0].suggestedHiKg ?? "-"}`
-                              : "-";
-
-                            return (
-                              <tr key={exercise.id} className="border-t border-slate-800">
-                                <td className="px-4 py-2">{exercise.name}</td>
-                                <td className={`px-4 py-2 ${typeColor}`}>{exercise.exerciseType ?? "Accessory"}</td>
-                                <td className="px-4 py-2">{exercise.targetSets ?? 3}</td>
-                                <td className="px-4 py-2">{exercise.repsDisplay ?? "8-12"}</td>
-                                <td className="px-4 py-2">{exercise.rpeDisplay ?? "7-8"}</td>
-                                <td className="px-4 py-2 text-green-300">{loadRange}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+          </aside>
         </div>
       </div>
     </main>
