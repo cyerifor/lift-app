@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { appendSetCookieHeaders, completeSignup } from "@/lib/auth/signup-flow";
+import { getBetterAuthSignupConflictStatus } from "@/lib/auth/errors";
 
 const acceptInviteSchema = z.object({
   inviteToken: z.string().min(1),
@@ -178,7 +179,10 @@ export async function POST(request: Request) {
 
     return response;
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    if (
+      getBetterAuthSignupConflictStatus(error) === 409 ||
+      (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002")
+    ) {
       return NextResponse.json({ error: "Email already in use" }, { status: 409 });
     }
     return NextResponse.json(

@@ -9,6 +9,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { appendSetCookieHeaders, completeSignup } from "@/lib/auth/signup-flow";
+import { getBetterAuthSignupConflictStatus } from "@/lib/auth/errors";
 
 const signupSchema = z.object({
   email: z.string().email().trim().toLowerCase(),
@@ -165,7 +166,10 @@ export async function POST(request: Request) {
     appendSetCookieHeaders(signup.headers, response.headers);
     return response;
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    if (
+      getBetterAuthSignupConflictStatus(error) === 409 ||
+      (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002")
+    ) {
       return NextResponse.json(
         {
           error: "Email already registered",

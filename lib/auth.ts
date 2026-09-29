@@ -2,6 +2,7 @@ import { prismaAdapter } from "@better-auth/prisma-adapter";
 import { betterAuth } from "better-auth";
 
 import { db } from "@/lib/db";
+import { authPlugins } from "@/lib/auth/nextjs-plugin";
 
 export type AppRole = "COACH" | "ATHLETE";
 
@@ -35,6 +36,7 @@ export const auth = betterAuth({
   trustedOrigins: process.env.BETTER_AUTH_TRUSTED_ORIGINS?.split(",")
     .map((origin) => origin.trim())
     .filter(Boolean),
+  plugins: authPlugins,
 });
 
 type CreateSessionArgs = {

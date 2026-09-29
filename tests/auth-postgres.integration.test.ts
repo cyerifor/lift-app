@@ -58,6 +58,11 @@ test(
       assert.equal(coachMe.role, "COACH");
       assert.ok(coachMe.coachId);
 
+      const duplicateCoachResponse = await coachSignup.POST(
+        new Request("http://localhost:3000/api/auth/signup", { method: "POST", body: form }),
+      );
+      assert.equal(duplicateCoachResponse.status, 409);
+
       const signOutResponse = await authRoute.POST(
         new Request("http://localhost:3000/api/auth/sign-out", {
           method: "POST",
@@ -122,6 +127,40 @@ test(
       const athleteMe = (await athleteMeResponse.json()) as { role: string; athleteId: string | null };
       assert.equal(athleteMe.role, "ATHLETE");
       assert.ok(athleteMe.athleteId);
+
+      const retryInvite = await db.inviteToken.create({
+        data: {
+          coachId: coachMe.coachId!,
+          email: athleteEmail,
+          token: `duplicate-${suffix}`,
+          expiresAt: new Date(Date.now() + 60_000),
+        },
+      });
+      const duplicateAthleteResponse = await athleteSignup.POST(
+        new Request("http://localhost:3000/api/auth/athlete-accept-invite", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            inviteToken: retryInvite.token,
+            email: athleteEmail,
+            password,
+            personalName: "Duplicate Athlete",
+            dob: "1990-01-01",
+            gender: "Other",
+            bodyweight: 80,
+            competitionDate: "",
+            squatMax: 0,
+            benchMax: 0,
+            deadliftMax: 0,
+            goals: "strength",
+            trainingAge: "1",
+            injuries: "",
+            notes: "",
+          }),
+        }),
+      );
+      assert.equal(duplicateAthleteResponse.status, 409);
+      assert.equal((await db.inviteToken.findUniqueOrThrow({ where: { id: retryInvite.id } })).status, "PENDING");
     } finally {
       await db.user.deleteMany({ where: { email: { in: [coachEmail, athleteEmail] } } });
       await db.$disconnect();

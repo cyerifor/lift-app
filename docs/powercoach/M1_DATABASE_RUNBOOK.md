@@ -45,10 +45,10 @@ backups and point-in-time recovery policy must be selected before production
 launch. Roll application code back independently; use forward migrations for
 database correction rather than editing an already-applied migration.
 
-The PostgreSQL auth integration test is opt-in so the normal unit suite never
-falls back to SQLite. Point it only at an isolated, migrated test database:
+The normal unit suite never falls back to SQLite. The dedicated PostgreSQL gate
+fails immediately when `TEST_DATABASE_URL` is missing, applies and checks the
+migrations, then runs the auth integration suite against that database:
 
 ```sh
-DATABASE_URL="$TEST_DATABASE_URL" DIRECT_URL="$TEST_DATABASE_URL" npx prisma migrate deploy
-TEST_DATABASE_URL="$TEST_DATABASE_URL" npm test
+TEST_DATABASE_URL="postgresql://.../isolated_test_database" npm run test:postgres
 ```

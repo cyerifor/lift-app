@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { APIError } from "better-auth";
+
 import { appendSetCookieHeaders, completeSignup } from "../lib/auth/signup-flow.ts";
 
 type FakeState = {
@@ -96,4 +98,29 @@ test("forwards every Set-Cookie value and no unrelated headers", () => {
     "second=two; Path=/; SameSite=Lax",
   ]);
   assert.equal(target.has("x-internal"), false);
+});
+
+test("duplicate athlete signup never enters the profile transaction or consumes the invite", async () => {
+  let profileTransactionStarted = false;
+  let inviteStatus: "PENDING" | "ACCEPTED" = "PENDING";
+
+  await assert.rejects(
+    completeSignup({
+      signUp: async () => {
+        throw new APIError("UNPROCESSABLE_ENTITY", {
+          code: "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL",
+          message: "User already exists. Use another email.",
+        });
+      },
+      createProfile: async () => {
+        profileTransactionStarted = true;
+        inviteStatus = "ACCEPTED";
+      },
+      rollbackAuthUser: async () => undefined,
+    }),
+    (error: unknown) => error instanceof APIError && error.body?.code === "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL",
+  );
+
+  assert.equal(profileTransactionStarted, false);
+  assert.equal(inviteStatus, "PENDING");
 });
