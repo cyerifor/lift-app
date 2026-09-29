@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { appendSetCookieHeaders, completeSignup } from "@/lib/auth/signup-flow";
 
 const acceptInviteSchema = z.object({
   inviteToken: z.string().min(1),
@@ -111,50 +112,55 @@ export async function POST(request: Request) {
       );
     }
 
-    const signup = await auth.api.signUpEmail({
-      body: { email: payload.email, password: payload.password, name: payload.personalName },
-      headers: request.headers,
-      returnHeaders: true,
-    });
-    const created = await db.$transaction(async (tx) => {
-      const athlete = await tx.athlete.create({
-        data: {
-          userId: signup.response.user.id,
-          coachId: invite.coachId,
-          dateOfBirth,
-          notes: JSON.stringify({
-            gender: payload.gender,
-            bodyweight: payload.bodyweight,
-            competitionDate: competitionDate?.toISOString() ?? null,
-            squatMax: payload.squatMax,
-            benchMax: payload.benchMax,
-            deadliftMax: payload.deadliftMax,
-            goals: payload.goals,
-            trainingAge: payload.trainingAge,
-            injuries: payload.injuries || null,
-            notes: payload.notes || null,
-          }),
-        },
-      });
+    const { signup, profile: created } = await completeSignup({
+      signUp: () =>
+        auth.api.signUpEmail({
+          body: { email: payload.email, password: payload.password, name: payload.personalName },
+          headers: request.headers,
+          returnHeaders: true,
+        }),
+      createProfile: (userId) =>
+        db.$transaction(async (tx) => {
+          const athlete = await tx.athlete.create({
+            data: {
+              userId,
+              coachId: invite.coachId,
+              dateOfBirth,
+              notes: JSON.stringify({
+                gender: payload.gender,
+                bodyweight: payload.bodyweight,
+                competitionDate: competitionDate?.toISOString() ?? null,
+                squatMax: payload.squatMax,
+                benchMax: payload.benchMax,
+                deadliftMax: payload.deadliftMax,
+                goals: payload.goals,
+                trainingAge: payload.trainingAge,
+                injuries: payload.injuries || null,
+                notes: payload.notes || null,
+              }),
+            },
+          });
 
-      await tx.userSettings.create({
-        data: {
-          userId: signup.response.user.id,
-          displayName: payload.personalName,
-          bodyweightKg: payload.bodyweight,
-        },
-      });
+          await tx.userSettings.create({
+            data: {
+              userId,
+              displayName: payload.personalName,
+              bodyweightKg: payload.bodyweight,
+            },
+          });
 
-      await tx.inviteToken.update({
-        where: { id: invite.id },
-        data: {
-          usedAt: new Date(),
-          status: "ACCEPTED",
-          athleteId: athlete.id,
-        },
-      });
+          await tx.inviteToken.update({
+            where: { id: invite.id },
+            data: {
+              usedAt: new Date(),
+              status: "ACCEPTED",
+              athleteId: athlete.id,
+            },
+          });
 
-      return { athlete };
+          return { athlete };
+        }),
+      rollbackAuthUser: (userId) => db.user.delete({ where: { id: userId } }).then(() => undefined),
     });
 
     const coachBio = parseCoachBio(invite.coach.bio);
@@ -168,7 +174,7 @@ export async function POST(request: Request) {
       { status: 201 },
     );
 
-    signup.headers.forEach((value, key) => response.headers.append(key, value));
+    appendSetCookieHeaders(signup.headers, response.headers);
 
     return response;
   } catch (error) {

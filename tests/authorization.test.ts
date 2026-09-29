@@ -31,3 +31,13 @@ test("denies cross-athlete access and unassigned coach access", () => {
   assert.equal(canManageAthlete(selfCoached, { id: "athlete-b", userId: "user-b", coachId: null }), false);
   assert.equal(canManageAthlete(assignedCoach, { id: "athlete-a", userId: "user-a", coachId: null }), false);
 });
+
+test("denies a different coach from managing another coach's athlete", () => {
+  const otherCoach: AuthorizationIdentity = {
+    id: "user-other-coach",
+    role: "COACH",
+    coachProfile: { id: "coach-b" },
+    athleteProfile: null,
+  };
+  assert.equal(canManageAthlete(otherCoach, { id: "athlete-a", userId: "user-a", coachId: "coach-a" }), false);
+});

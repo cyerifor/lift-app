@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { getLoginDestination, type SessionIdentity } from "@/lib/auth/login-destination";
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -35,7 +37,22 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/dashboard");
+      const sessionResponse = await fetch("/api/auth/me", { cache: "no-store" });
+      if (!sessionResponse.ok) {
+        await fetch("/api/auth/sign-out", { method: "POST" });
+        setError("Your account session could not be resolved. Please sign in again.");
+        return;
+      }
+
+      const identity = (await sessionResponse.json()) as SessionIdentity;
+      const destination = getLoginDestination(identity);
+      if (!destination) {
+        await fetch("/api/auth/sign-out", { method: "POST" });
+        setError("Your account profile is incomplete. Contact support before signing in.");
+        return;
+      }
+
+      router.push(destination);
     } catch {
       setError("Network error. Please check your connection and try again.");
     } finally {

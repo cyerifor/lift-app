@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type AthleteOption = { athleteId: string; personalName: string | null; email: string };
 
-export default function NewBlockPage() {
+function NewBlockPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [athletes, setAthletes] = useState<AthleteOption[]>([]);
@@ -215,5 +215,13 @@ export default function NewBlockPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function NewBlockPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-slate-950 px-4 py-8 text-white">Loading...</main>}>
+      <NewBlockPageContent />
+    </Suspense>
   );
 }

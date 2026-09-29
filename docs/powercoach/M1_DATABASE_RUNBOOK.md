@@ -44,3 +44,11 @@ sign-in, `/api/auth/me`, sign-out, and role/ownership denial checks. Supabase
 backups and point-in-time recovery policy must be selected before production
 launch. Roll application code back independently; use forward migrations for
 database correction rather than editing an already-applied migration.
+
+The PostgreSQL auth integration test is opt-in so the normal unit suite never
+falls back to SQLite. Point it only at an isolated, migrated test database:
+
+```sh
+DATABASE_URL="$TEST_DATABASE_URL" DIRECT_URL="$TEST_DATABASE_URL" npx prisma migrate deploy
+TEST_DATABASE_URL="$TEST_DATABASE_URL" npm test
+```

@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { appendSetCookieHeaders, completeSignup } from "@/lib/auth/signup-flow";
 
 const signupSchema = z.object({
   email: z.string().email().trim().toLowerCase(),
@@ -115,38 +116,43 @@ export async function POST(request: Request) {
   }
 
   try {
-    const signup = await auth.api.signUpEmail({
-      body: {
-        email: payload.email,
-        password: payload.password,
-        name: payload.personalName,
-        image: normalizedLogoUrl ?? undefined,
-      },
-      headers: request.headers,
-      returnHeaders: true,
-    });
-
-    const coach = await db.$transaction(async (tx) => {
-      await tx.user.update({ where: { id: signup.response.user.id }, data: { role: "COACH" } });
-      const createdCoach = await tx.coach.create({
-        data: {
-          userId: signup.response.user.id,
-          bio: JSON.stringify({
-            businessName: payload.businessName,
-            logoUrl: normalizedLogoUrl,
-          }),
-          specialty: payload.tier,
-        },
-      });
-      await tx.userSettings.create({
-        data: {
-          userId: signup.response.user.id,
-          displayName: payload.personalName,
-          timezone: payload.timezone,
-          displayUnits: payload.defaultUnits === "lb" || payload.defaultUnits === "IMPERIAL" ? "IMPERIAL" : "METRIC",
-        },
-      });
-      return createdCoach;
+    const { signup, profile: coach } = await completeSignup({
+      signUp: () =>
+        auth.api.signUpEmail({
+          body: {
+            email: payload.email,
+            password: payload.password,
+            name: payload.personalName,
+            image: normalizedLogoUrl ?? undefined,
+          },
+          headers: request.headers,
+          returnHeaders: true,
+        }),
+      createProfile: (userId) =>
+        db.$transaction(async (tx) => {
+          await tx.user.update({ where: { id: userId }, data: { role: "COACH" } });
+          const createdCoach = await tx.coach.create({
+            data: {
+              userId,
+              bio: JSON.stringify({
+                businessName: payload.businessName,
+                logoUrl: normalizedLogoUrl,
+              }),
+              specialty: payload.tier,
+            },
+          });
+          await tx.userSettings.create({
+            data: {
+              userId,
+              displayName: payload.personalName,
+              timezone: payload.timezone,
+              displayUnits:
+                payload.defaultUnits === "lb" || payload.defaultUnits === "IMPERIAL" ? "IMPERIAL" : "METRIC",
+            },
+          });
+          return createdCoach;
+        }),
+      rollbackAuthUser: (userId) => db.user.delete({ where: { id: userId } }).then(() => undefined),
     });
     const response = NextResponse.json(
       {
@@ -156,7 +162,7 @@ export async function POST(request: Request) {
       },
       { status: 201 },
     );
-    signup.headers.forEach((value, key) => response.headers.append(key, value));
+    appendSetCookieHeaders(signup.headers, response.headers);
     return response;
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
