@@ -1,24 +1,11 @@
 import { db } from "@/lib/db";
-import { requireAthleteAuth } from "@/lib/session";
+import { requireAthleteUser } from "@/lib/auth/authorization";
 
 export async function requireAthlete(request: Request) {
-  const authUser = await requireAthleteAuth(request);
-  if (authUser?.athleteId) {
-    const athleteFromSession = await db.athlete.findUnique({
-      where: { id: authUser.athleteId },
-      include: { user: true, coach: true },
-    });
-    if (athleteFromSession) return athleteFromSession;
-  }
-
-  const athleteId = request.headers.get("x-athlete-id");
-  if (!athleteId) return null;
-
-  const athlete = await db.athlete.findUnique({
-    where: { id: athleteId },
+  const authUser = await requireAthleteUser(request);
+  if (!authUser?.athleteProfile) return null;
+  return db.athlete.findUnique({
+    where: { id: authUser.athleteProfile.id },
     include: { user: true, coach: true },
   });
-
-  if (!athlete || athlete.user.role !== "ATHLETE") return null;
-  return athlete;
 }

@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type AthleteOption = { athleteId: string; personalName: string | null; email: string };
 
-export default function NewBlockPage() {
+function NewBlockPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [coachId, setCoachId] = useState("");
   const [athletes, setAthletes] = useState<AthleteOption[]>([]);
   const [loadingAthletes, setLoadingAthletes] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -38,17 +37,11 @@ export default function NewBlockPage() {
   );
 
   useEffect(() => {
-    const storedCoachId = localStorage.getItem("coach_id") || "";
-    setCoachId(storedCoachId);
-  }, []);
-
-  useEffect(() => {
     async function loadAthletes() {
-      if (!coachId) return;
       setLoadingAthletes(true);
       try {
         const response = await fetch("/api/coach/athletes", {
-          headers: { "x-coach-id": coachId },
+
         });
         const data = (await response.json()) as { athletes?: AthleteOption[]; error?: string };
         if (!response.ok) {
@@ -69,7 +62,7 @@ export default function NewBlockPage() {
       }
     }
     void loadAthletes();
-  }, [coachId, searchParams]);
+  }, [searchParams]);
 
   async function createBlock() {
     if (!athleteId) {
@@ -84,7 +77,6 @@ export default function NewBlockPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-coach-id": coachId,
         },
         body: JSON.stringify({
           athleteId,
@@ -215,7 +207,7 @@ export default function NewBlockPage() {
 
           <button
             onClick={createBlock}
-            disabled={isCreating || !coachId}
+            disabled={isCreating}
             className="rounded-lg bg-blue-600 px-4 py-2 font-medium hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isCreating ? "Creating..." : "Create block"}
@@ -223,5 +215,13 @@ export default function NewBlockPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function NewBlockPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-slate-950 px-4 py-8 text-white">Loading...</main>}>
+      <NewBlockPageContent />
+    </Suspense>
   );
 }

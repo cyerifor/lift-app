@@ -1,0 +1,86 @@
+name: PowerCoach PostgreSQL verification
+
+on:
+  pull_request:
+    branches:
+      - powercoach-bootstrap
+  push:
+    branches:
+      - powercoach-bootstrap
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-m1a:
+    name: M1A auth and M1B Exercise Library checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: powercoach
+          POSTGRES_PASSWORD: powercoach
+          POSTGRES_DB: powercoach_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U powercoach -d powercoach_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      TEST_DATABASE_URL: postgresql://powercoach:powercoach@localhost:5432/powercoach_test
+      DATABASE_URL: postgresql://powercoach:powercoach@localhost:5432/powercoach_test
+      DIRECT_URL: postgresql://powercoach:powercoach@localhost:5432/powercoach_test
+      BETTER_AUTH_SECRET: github-actions-m1a-secret-at-least-32-characters
+      BETTER_AUTH_URL: http://localhost:3000
+      BETTER_AUTH_TRUSTED_ORIGINS: http://localhost:3000
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify Prisma formatting
+        shell: bash
+        run: |
+          cp prisma/schema.prisma /tmp/schema.prisma
+          npx prisma format --schema /tmp/schema.prisma
+          diff --unified prisma/schema.prisma /tmp/schema.prisma
+
+      - name: Validate Prisma schema
+        run: npx prisma validate
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Validate PowerCoach exercise seed
+        run: npm run validate:seeds
+
+      - name: Verify PostgreSQL migrations and Better Auth integration
+        run: npm run test:postgres
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Build production application
+        run: npm run build

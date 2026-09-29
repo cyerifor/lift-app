@@ -19,25 +19,18 @@ type ReviewItem = {
 };
 
 export default function ReviewsPage() {
-  const [coachId, setCoachId] = useState("");
   const [filter, setFilter] = useState<"pending" | "all">("pending");
   const [items, setItems] = useState<ReviewItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const stored = localStorage.getItem("coach_id") || "";
-    setCoachId(stored);
-  }, []);
-
-  useEffect(() => {
-    if (!coachId) return;
     async function load() {
       setIsLoading(true);
       setError("");
       try {
         const response = await fetch(`/api/coach/reviews?filter=${filter}`, {
-          headers: { "x-coach-id": coachId },
+
         });
         const data = (await response.json()) as { items?: ReviewItem[]; error?: string };
         if (!response.ok) {
@@ -52,7 +45,7 @@ export default function ReviewsPage() {
       }
     }
     void load();
-  }, [coachId, filter]);
+  }, [filter]);
 
   return (
     <main className="min-h-screen bg-slate-950 p-6 text-white">

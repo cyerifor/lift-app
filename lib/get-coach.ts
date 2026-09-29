@@ -1,27 +1,11 @@
 import { db } from "@/lib/db";
-import { requireCoachAuth } from "@/lib/session";
+import { requireCoachUser } from "@/lib/auth/authorization";
 
 export async function requireCoach(request: Request) {
-  const authUser = await requireCoachAuth(request);
-  if (authUser?.coachId) {
-    const coachFromSession = await db.coach.findUnique({
-      where: { id: authUser.coachId },
-      include: { user: true },
-    });
-    if (coachFromSession) return coachFromSession;
-  }
-
-  const coachId = request.headers.get("x-coach-id");
-  if (!coachId) return null;
-
-  const coach = await db.coach.findUnique({
-    where: { id: coachId },
+  const authUser = await requireCoachUser(request);
+  if (!authUser?.coachProfile) return null;
+  return db.coach.findUnique({
+    where: { id: authUser.coachProfile.id },
     include: { user: true },
   });
-
-  if (!coach || coach.user.role !== "COACH") {
-    return null;
-  }
-
-  return coach;
 }

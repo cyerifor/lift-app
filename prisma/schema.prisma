@@ -3,14 +3,20 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum Role {
   COACH
   ATHLETE
   ADMIN
+}
+
+enum DisplayUnits {
+  METRIC
+  IMPERIAL
 }
 
 enum BlockStatus {
@@ -44,99 +50,179 @@ enum InviteStatus {
   EXPIRED
 }
 
+enum ExerciseMainLift {
+  SQUAT
+  BENCH
+  DEADLIFT
+  ACCESSORY
+}
+
+enum ExerciseCapability {
+  LOADED_REPS
+  BODYWEIGHT_REPS
+  WEIGHTED_BODYWEIGHT
+  TIME
+}
+
+enum ExerciseMode {
+  PERCENT_E1RM
+  REP_TARGET
+  DOUBLE_PROGRESSION
+}
+
+enum ProgressionEligibility {
+  YES
+  NO
+  OPTIONAL
+}
+
+enum ExerciseSource {
+  SEEDED
+  CUSTOM
+  IMPORTED
+}
+
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  role      Role     @default(ATHLETE)
-  imageUrl  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(cuid())
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  name          String
+  image         String?
+  role          Role     @default(ATHLETE)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   coachProfile   Coach?
   athleteProfile Athlete?
-  sessions       UserSession[]
+  settings       UserSettings?
+  sessions       SessionAccount[]
+  accounts       Account[]
 
   @@index([role])
 }
 
-model UserSession {
+model SessionAccount {
   id        String   @id @default(cuid())
-  userId    String
-  token     String   @unique
   expiresAt DateTime
+  token     String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
+  ipAddress String?
+  userAgent String?
+  userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([expiresAt])
+  @@map("AuthSession")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+model UserSettings {
+  id                String       @id @default(cuid())
+  userId            String       @unique
+  displayName       String?
+  displayUnits      DisplayUnits @default(METRIC)
+  bodyweightKg      Float?
+  defaultLoadStepKg Float?       @default(2.5)
+  timezone          String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Coach {
-  id          String    @id @default(cuid())
-  userId      String    @unique
-  bio         String?
-  specialty   String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  bio       String?
+  specialty String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  athletes    Athlete[]
-  blocks      Block[]
-  feedbacks   Feedback[]
-  sessionLogs SessionLog[]
-  mediaAssets MediaAsset[]
-  analytics   Analytics[]
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  athletes     Athlete[]
+  blocks       Block[]
+  feedbacks    Feedback[]
+  sessionLogs  SessionLog[]
+  mediaAssets  MediaAsset[]
+  analytics    Analytics[]
   inviteTokens InviteToken[]
-  exerciseTemplates ExerciseTemplate[]
 }
 
 model Athlete {
   id          String    @id @default(cuid())
   userId      String    @unique
-  coachId     String
+  coachId     String?
   dateOfBirth DateTime?
   notes       String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  coach       Coach     @relation(fields: [coachId], references: [id], onDelete: Restrict)
-  blocks      Block[]
-  sessionLogs SessionLog[]
-  feedbacks   Feedback[]
-  mediaAssets MediaAsset[]
-  analytics   Analytics[]
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coach        Coach?        @relation(fields: [coachId], references: [id], onDelete: SetNull)
+  blocks       Block[]
+  sessionLogs  SessionLog[]
+  feedbacks    Feedback[]
+  mediaAssets  MediaAsset[]
+  analytics    Analytics[]
   inviteTokens InviteToken[]
+  exercises    Exercise[]
 
   @@index([coachId])
 }
 
 model Block {
-  id          String      @id @default(cuid())
-  coachId     String
-  athleteId   String
-  title       String
-  blockNumber Int         @default(1)
-  phase       String?     @default("Accumulation")
-  weekCount   Int         @default(6)
-  sessionsPerWeek Int     @default(4)
-  config      String?
-  goal        String?
-  status      BlockStatus @default(DRAFT)
-  startDate   DateTime
-  endDate     DateTime
-  notes       String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id              String      @id @default(cuid())
+  coachId         String
+  athleteId       String
+  title           String
+  blockNumber     Int         @default(1)
+  phase           String?     @default("Accumulation")
+  weekCount       Int         @default(6)
+  sessionsPerWeek Int         @default(4)
+  config          String?
+  goal            String?
+  status          BlockStatus @default(DRAFT)
+  startDate       DateTime
+  endDate         DateTime
+  notes           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
-  coach       Coach       @relation(fields: [coachId], references: [id], onDelete: Restrict)
-  athlete     Athlete     @relation(fields: [athleteId], references: [id], onDelete: Restrict)
-  weeks       Week[]
-  feedbacks   Feedback[]
-  analytics   Analytics[]
+  coach     Coach       @relation(fields: [coachId], references: [id], onDelete: Restrict)
+  athlete   Athlete     @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  weeks     Week[]
+  feedbacks Feedback[]
+  analytics Analytics[]
 
   @@index([coachId])
   @@index([athleteId])
@@ -153,66 +239,68 @@ model Week {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  block      Block    @relation(fields: [blockId], references: [id], onDelete: Cascade)
-  sessions   Session[]
+  block    Block     @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  sessions Session[]
 
   @@unique([blockId, weekNumber])
   @@index([blockId])
 }
 
 model Session {
-  id          String        @id @default(cuid())
-  weekId      String
-  sessionNumber Int         @default(1)
-  dayOfWeek    String?
-  title       String
-  scheduledAt DateTime?
-  status      SessionStatus @default(PLANNED)
-  durationMin Int?
-  notes       String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id            String        @id @default(cuid())
+  weekId        String
+  sessionNumber Int           @default(1)
+  dayOfWeek     String?
+  title         String
+  scheduledAt   DateTime?
+  status        SessionStatus @default(PLANNED)
+  durationMin   Int?
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
-  week        Week          @relation(fields: [weekId], references: [id], onDelete: Cascade)
-  exercises   Exercise[]
-  logs        SessionLog[]
-  feedbacks   Feedback[]
-  analytics   Analytics[]
+  week      Week           @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  exercises ExerciseSlot[]
+  logs      SessionLog[]
+  feedbacks Feedback[]
+  analytics Analytics[]
 
+  @@unique([weekId, sessionNumber])
   @@index([weekId])
   @@index([scheduledAt])
-  @@unique([weekId, sessionNumber])
 }
 
-model Exercise {
-  id           String   @id @default(cuid())
-  sessionId    String
-  exerciseTemplateId String?
-  name         String
-  exerciseType String?  @default("Accessory")
-  mainLift     String?  @default("accessory")
-  category     String?
-  progressionGroup String? @default("accessory")
-  targetSets   Int?     @default(3)
-  repsDisplay  String?
-  rpeDisplay   String?
-  weeklyPercent Float?
-  roundingKg   Float?   @default(2.5)
-  progEligible Boolean  @default(true)
-  orderIndex   Int
-  instructions String?
-  tempo        String?
-  restSec      Int?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+model ExerciseSlot {
+  id               String   @id @default(cuid())
+  sessionId        String
+  exerciseId       String?  @map("exerciseTemplateId")
+  name             String
+  exerciseType     String?  @default("Accessory")
+  mainLift         String?  @default("accessory")
+  category         String?
+  progressionGroup String?  @default("accessory")
+  targetSets       Int?     @default(3)
+  repsDisplay      String?
+  rpeDisplay       String?
+  weeklyPercent    Float?
+  roundingKg       Float?   @default(2.5)
+  progEligible     Boolean  @default(true)
+  orderIndex       Int
+  instructions     String?
+  tempo            String?
+  restSec          Int?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   session          Session           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  exerciseTemplate ExerciseTemplate? @relation(fields: [exerciseTemplateId], references: [id], onDelete: SetNull)
+  exercise         Exercise?         @relation(fields: [exerciseId], references: [id], onDelete: SetNull)
   setPrescriptions SetPrescription[]
   setLogs          SetLog[]
 
-  @@index([sessionId])
   @@unique([sessionId, orderIndex])
+  @@index([sessionId])
+  @@index([exerciseId])
+  @@map("Exercise")
 }
 
 model SetPrescription {
@@ -231,33 +319,45 @@ model SetPrescription {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  exercise      Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  exercise ExerciseSlot @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
 
-  @@index([exerciseId])
   @@unique([exerciseId, setNumber])
+  @@index([exerciseId])
 }
 
-model ExerciseTemplate {
-  id               String   @id @default(cuid())
-  coachId          String?
-  name             String
-  mainLift         String
-  category         String
-  progressionGroup String
-  movementPattern  String?
-  equipment        String?
-  tier             Int      @default(1)
-  roundingKg       Float    @default(2.5)
-  progEligible     Boolean  @default(true)
-  isCustom         Boolean  @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+model Exercise {
+  id                     String                 @id @default(cuid())
+  athleteId              String
+  legacyId               String?
+  name                   String
+  normalizedName         String
+  mainLift               ExerciseMainLift
+  category               String
+  movementPattern        String?
+  equipment              String?
+  capability             ExerciseCapability
+  defaultMode            ExerciseMode
+  active                 Boolean                @default(true)
+  parentLift             ExerciseMainLift?
+  progressionGroup       String?
+  progressionEligibility ProgressionEligibility @default(NO)
+  loadStepKg             Float?
+  tier                   Int                    @default(1)
+  restText               String?
+  seedRatio              Float?
+  notes                  String?
+  source                 ExerciseSource         @default(CUSTOM)
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
 
-  coach            Coach?   @relation(fields: [coachId], references: [id], onDelete: SetNull)
-  exercises        Exercise[]
+  athlete Athlete        @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  slots   ExerciseSlot[]
 
-  @@index([coachId])
-  @@index([mainLift, category])
+  @@unique([athleteId, normalizedName])
+  @@unique([athleteId, legacyId])
+  @@index([athleteId, active])
+  @@index([athleteId, mainLift, category])
+  @@map("ExerciseTemplate")
 }
 
 model SessionLog {
@@ -273,22 +373,22 @@ model SessionLog {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  athlete           Athlete  @relation(fields: [athleteId], references: [id], onDelete: Restrict)
-  session           Session  @relation(fields: [sessionId], references: [id], onDelete: Restrict)
-  coachReviewer     Coach?   @relation(fields: [coachReviewerId], references: [id], onDelete: SetNull)
-  setLogs           SetLog[]
-  mediaAssets       MediaAsset[]
-  feedbacks         Feedback[]
-  analytics         Analytics[]
+  athlete       Athlete      @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  session       Session      @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  coachReviewer Coach?       @relation(fields: [coachReviewerId], references: [id], onDelete: SetNull)
+  setLogs       SetLog[]
+  mediaAssets   MediaAsset[]
+  feedbacks     Feedback[]
+  analytics     Analytics[]
 
+  @@unique([athleteId, sessionId, completedAt])
   @@index([athleteId])
   @@index([sessionId])
   @@index([coachReviewerId])
-  @@unique([athleteId, sessionId, completedAt])
 }
 
 model SetLog {
-  id            String    @id @default(cuid())
+  id            String   @id @default(cuid())
   sessionLogId  String
   exerciseId    String
   setNumber     Int
@@ -297,15 +397,15 @@ model SetLog {
   rpe           Float?
   velocityMps   Float?
   notes         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  sessionLog    SessionLog @relation(fields: [sessionLogId], references: [id], onDelete: Cascade)
-  exercise      Exercise   @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+  sessionLog SessionLog   @relation(fields: [sessionLogId], references: [id], onDelete: Cascade)
+  exercise   ExerciseSlot @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
 
+  @@unique([sessionLogId, exerciseId, setNumber])
   @@index([sessionLogId])
   @@index([exerciseId])
-  @@unique([sessionLogId, exerciseId, setNumber])
 }
 
 model Feedback {
@@ -321,11 +421,11 @@ model Feedback {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  coach        Coach        @relation(fields: [coachId], references: [id], onDelete: Restrict)
-  athlete      Athlete      @relation(fields: [athleteId], references: [id], onDelete: Restrict)
-  block        Block?       @relation(fields: [blockId], references: [id], onDelete: SetNull)
-  session      Session?     @relation(fields: [sessionId], references: [id], onDelete: SetNull)
-  sessionLog   SessionLog?  @relation(fields: [sessionLogId], references: [id], onDelete: SetNull)
+  coach      Coach       @relation(fields: [coachId], references: [id], onDelete: Restrict)
+  athlete    Athlete     @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  block      Block?      @relation(fields: [blockId], references: [id], onDelete: SetNull)
+  session    Session?    @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  sessionLog SessionLog? @relation(fields: [sessionLogId], references: [id], onDelete: SetNull)
 
   @@index([coachId])
   @@index([athleteId])
@@ -347,9 +447,9 @@ model MediaAsset {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  coach        Coach?     @relation(fields: [coachId], references: [id], onDelete: SetNull)
-  athlete      Athlete?   @relation(fields: [athleteId], references: [id], onDelete: SetNull)
-  sessionLog   SessionLog? @relation(fields: [sessionLogId], references: [id], onDelete: SetNull)
+  coach      Coach?      @relation(fields: [coachId], references: [id], onDelete: SetNull)
+  athlete    Athlete?    @relation(fields: [athleteId], references: [id], onDelete: SetNull)
+  sessionLog SessionLog? @relation(fields: [sessionLogId], references: [id], onDelete: SetNull)
 
   @@index([coachId])
   @@index([athleteId])
@@ -357,7 +457,7 @@ model MediaAsset {
 }
 
 model Analytics {
-  id           String    @id @default(cuid())
+  id           String   @id @default(cuid())
   coachId      String?
   athleteId    String?
   blockId      String?
@@ -365,14 +465,14 @@ model Analytics {
   sessionLogId String?
   metricKey    String
   metricValue  Float
-  recordedAt   DateTime  @default(now())
-  createdAt    DateTime  @default(now())
+  recordedAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
 
-  coach        Coach?      @relation(fields: [coachId], references: [id], onDelete: SetNull)
-  athlete      Athlete?    @relation(fields: [athleteId], references: [id], onDelete: SetNull)
-  block        Block?      @relation(fields: [blockId], references: [id], onDelete: SetNull)
-  session      Session?    @relation(fields: [sessionId], references: [id], onDelete: SetNull)
-  sessionLog   SessionLog? @relation(fields: [sessionLogId], references: [id], onDelete: SetNull)
+  coach      Coach?      @relation(fields: [coachId], references: [id], onDelete: SetNull)
+  athlete    Athlete?    @relation(fields: [athleteId], references: [id], onDelete: SetNull)
+  block      Block?      @relation(fields: [blockId], references: [id], onDelete: SetNull)
+  session    Session?    @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  sessionLog SessionLog? @relation(fields: [sessionLogId], references: [id], onDelete: SetNull)
 
   @@index([metricKey, recordedAt])
   @@index([coachId])
@@ -383,20 +483,20 @@ model Analytics {
 }
 
 model InviteToken {
-  id             String   @id @default(cuid())
-  coachId        String
-  athleteId      String?
-  email          String?
-  token          String   @unique
-  sendInviteEmail Boolean @default(false)
-  status         InviteStatus @default(PENDING)
-  expiresAt      DateTime
-  usedAt         DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String       @id @default(cuid())
+  coachId         String
+  athleteId       String?
+  email           String?
+  token           String       @unique
+  sendInviteEmail Boolean      @default(false)
+  status          InviteStatus @default(PENDING)
+  expiresAt       DateTime
+  usedAt          DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
-  coach          Coach    @relation(fields: [coachId], references: [id], onDelete: Cascade)
-  athlete        Athlete? @relation(fields: [athleteId], references: [id], onDelete: SetNull)
+  coach   Coach    @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  athlete Athlete? @relation(fields: [athleteId], references: [id], onDelete: SetNull)
 
   @@index([coachId])
   @@index([email])

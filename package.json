@@ -2,11 +2,16 @@
   "name": "lift-app",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "test:postgres": "node scripts/verify-postgres.mjs",
+    "validate:seeds": "node --experimental-strip-types scripts/validate-exercise-seeds.ts"
   },
   "dependencies": {
     "@better-auth/prisma-adapter": "^1.6.3",

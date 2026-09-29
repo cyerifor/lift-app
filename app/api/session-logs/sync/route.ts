@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     });
     if (!sessionLog) return NextResponse.json({ error: "Session log not found" }, { status: 404 });
 
-    const exercises = await db.exercise.findMany({
+    const exercises = await db.exerciseSlot.findMany({
       where: { sessionId: payload.sessionId },
       select: { id: true, name: true, mainLift: true, roundingKg: true },
     });
