@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 
-import type { ExerciseInput, ExerciseListQuery } from "@/lib/exercises/schema";
+import type { ExerciseInput, ExerciseListQuery, ExerciseUpdateInput } from "@/lib/exercises/schema";
 
 type DatabaseClient = PrismaClient | Prisma.TransactionClient;
 
@@ -58,7 +58,7 @@ export class ExerciseRepository {
     });
   }
 
-  update(athleteId: string, exerciseId: string, input: ExerciseInput, normalizedName: string) {
+  update(athleteId: string, exerciseId: string, input: ExerciseUpdateInput, normalizedName: string) {
     return this.database.exercise.update({
       where: { id: exerciseId, athleteId },
       data: { ...input, normalizedName },

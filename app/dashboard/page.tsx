@@ -235,6 +235,9 @@ export default function DashboardPage() {
                           <a href={`/dashboard/analytics/${athlete.athleteId}`} className="mr-2 rounded border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">
                             Analytics
                           </a>
+                          <a href={`/exercises?athleteId=${athlete.athleteId}`} className="mr-2 rounded border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">
+                            Library
+                          </a>
                           <a href={`/dashboard/blocks/new?athleteId=${athlete.athleteId}`} className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">
                             + Block
                           </a>

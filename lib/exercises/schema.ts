@@ -10,8 +10,7 @@ export const exerciseCapabilitySchema = z.enum([
 export const exerciseModeSchema = z.enum(["PERCENT_E1RM", "REP_TARGET", "DOUBLE_PROGRESSION"]);
 export const progressionEligibilitySchema = z.enum(["YES", "NO", "OPTIONAL"]);
 
-export const exerciseInputSchema = z
-  .object({
+const exerciseFields = {
     name: z.string().trim().min(1).max(120),
     mainLift: exerciseMainLiftSchema,
     category: z.string().trim().min(1).max(120),
@@ -28,8 +27,12 @@ export const exerciseInputSchema = z
     restText: z.string().trim().max(120).nullable().optional(),
     seedRatio: z.number().positive().nullable().optional(),
     notes: z.string().trim().max(2000).nullable().optional(),
-  })
-  .superRefine((value, context) => {
+};
+
+function capabilityRules(
+  value: { defaultMode: z.infer<typeof exerciseModeSchema>; capability: z.infer<typeof exerciseCapabilitySchema>; loadStepKg?: number | null },
+  context: z.RefinementCtx,
+) {
     if (value.defaultMode === "PERCENT_E1RM" && value.capability !== "LOADED_REPS") {
       context.addIssue({
         code: "custom",
@@ -54,9 +57,19 @@ export const exerciseInputSchema = z
         message: "Loaded exercises require a positive load step.",
       });
     }
-  });
+}
 
-export const exerciseUpdateSchema = exerciseInputSchema;
+export const exerciseInputSchema = z.object(exerciseFields).superRefine(capabilityRules);
+
+// Null is accepted at the PATCH boundary only so the service can preserve the five
+// intentionally unknown legacy values. The service rejects clearing known metadata.
+export const exerciseUpdateSchema = z
+  .object({
+    ...exerciseFields,
+    movementPattern: z.string().trim().min(1).max(120).nullable(),
+    equipment: z.string().trim().min(1).max(120).nullable(),
+  })
+  .superRefine(capabilityRules);
 
 export const exerciseListQuerySchema = z.object({
   athleteId: z.string().min(1).optional(),
@@ -74,4 +87,5 @@ export const duplicateExerciseSchema = z.object({ name: z.string().trim().min(1)
 export const athleteTargetSchema = z.object({ athleteId: z.string().min(1).optional() });
 
 export type ExerciseInput = z.infer<typeof exerciseInputSchema>;
+export type ExerciseUpdateInput = z.infer<typeof exerciseUpdateSchema>;
 export type ExerciseListQuery = z.infer<typeof exerciseListQuerySchema>;

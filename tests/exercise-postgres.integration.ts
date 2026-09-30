@@ -36,6 +36,31 @@ test(
       assert.equal(await db.exercise.count({ where: { athleteId: athlete.id } }), 117);
       assert.equal(await db.exercise.count({ where: { athleteId: otherAthlete.id } }), 117);
 
+      const legacyUnknown = await db.exercise.findFirstOrThrow({
+        where: { athleteId: athlete.id, OR: [{ movementPattern: null }, { equipment: null }] },
+      });
+      const legacyUpdated = await service.update(athlete.id, legacyUnknown.id, {
+        name: legacyUnknown.name,
+        mainLift: legacyUnknown.mainLift,
+        category: `${legacyUnknown.category} reviewed`,
+        movementPattern: legacyUnknown.movementPattern,
+        equipment: legacyUnknown.equipment,
+        capability: legacyUnknown.capability,
+        defaultMode: legacyUnknown.defaultMode,
+        active: legacyUnknown.active,
+        parentLift: legacyUnknown.parentLift === "ACCESSORY" ? null : legacyUnknown.parentLift,
+        progressionGroup: legacyUnknown.progressionGroup,
+        progressionEligibility: legacyUnknown.progressionEligibility,
+        loadStepKg: legacyUnknown.loadStepKg,
+        tier: legacyUnknown.tier,
+        restText: legacyUnknown.restText,
+        seedRatio: legacyUnknown.seedRatio,
+        notes: "Reviewed without inventing unknown metadata",
+      });
+      assert.equal(legacyUpdated.movementPattern, legacyUnknown.movementPattern);
+      assert.equal(legacyUpdated.equipment, legacyUnknown.equipment);
+      assert.match(legacyUpdated.category, /reviewed$/);
+
       const input = exerciseInputSchema.parse({
         name: "  M1B   Custom Squat  ",
         mainLift: "SQUAT",
@@ -53,6 +78,10 @@ test(
       const created = await service.create(athlete.id, input);
       assert.equal(created.name, "M1B   Custom Squat");
       assert.equal(created.normalizedName, "m1b custom squat");
+      await assert.rejects(
+        service.update(athlete.id, created.id, { ...input, movementPattern: null }),
+        /cannot be cleared/i,
+      );
       await assert.rejects(service.create(athlete.id, { ...input, name: "m1b custom squat" }), /already exists/);
       const sameNameOtherAthlete = await service.create(otherAthlete.id, input);
       assert.notEqual(sameNameOtherAthlete.id, created.id);

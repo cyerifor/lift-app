@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { ExerciseDialog } from "@/components/exercises/ExerciseDialog";
+import { ExercisePicker } from "@/components/exercises/ExercisePicker";
+import type { ExerciseRecord } from "@/lib/exercises/client";
+
 type SetPrescription = {
   id: string;
   setNumber: number;
@@ -49,6 +53,7 @@ type Week = {
 
 type BlockOutline = {
   id: string;
+  athleteId: string;
   title: string;
   status: string;
   startDate: string;
@@ -56,21 +61,11 @@ type BlockOutline = {
   weeks: Week[];
 };
 
-type ExerciseTemplate = {
-  id: string;
-  name: string;
-  mainLift: string;
-  category: string;
-  progressionGroup: string;
-  roundingKg: number;
-  progEligible: boolean;
-};
-
 export default function BlockBuilderPage() {
   const { blockId } = useParams<{ blockId: string }>();
 
   const [block, setBlock] = useState<BlockOutline | null>(null);
-  const [exerciseLibrary, setExerciseLibrary] = useState<ExerciseTemplate[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [activeWeek, setActiveWeek] = useState(1);
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -85,19 +80,14 @@ export default function BlockBuilderPage() {
       setIsLoading(true);
       setError("");
       try {
-        const [blockResponse, libraryResponse] = await Promise.all([
-          fetch(`/api/coach/blocks/${blockId}`),
-          fetch(`/api/coach/exercise-library?blockId=${encodeURIComponent(blockId)}`),
-        ]);
+        const blockResponse = await fetch(`/api/coach/blocks/${blockId}`);
 
         const data = (await blockResponse.json()) as BlockOutline & { error?: string };
-        const libraryData = (await libraryResponse.json()) as ExerciseTemplate[];
         if (!blockResponse.ok) {
           setError(data.error || "Unable to load block outline.");
           setBlock(null);
           return;
         }
-        setExerciseLibrary(Array.isArray(libraryData) ? libraryData : []);
         setBlock(data);
         setActiveWeek(1);
         const week1Session = data.weeks.find((week) => week.weekNumber === 1)?.sessions[0];
@@ -116,7 +106,7 @@ export default function BlockBuilderPage() {
   const totalSessions = useMemo(() => block?.weeks.reduce((sum, week) => sum + week.sessions.length, 0) ?? 0, [block]);
   const currentWeek = block?.weeks.find((week) => week.weekNumber === activeWeek) ?? null;
 
-  function addExerciseToSession(sessionId: string, template: ExerciseTemplate) {
+  function addExerciseToSession(sessionId: string, template: ExerciseRecord) {
     if (!block) return;
     setBlock((prev) => {
       if (!prev) return prev;
@@ -138,13 +128,13 @@ export default function BlockBuilderPage() {
                   exerciseType: "Accessory",
                   mainLift: template.mainLift,
                   category: template.category,
-                  progressionGroup: template.progressionGroup,
+                  progressionGroup: template.progressionGroup ?? undefined,
                   targetSets: 3,
                   repsDisplay: "8-12",
                   rpeDisplay: "7-8",
                   weeklyPercent: null,
-                  roundingKg: template.roundingKg,
-                  progEligible: template.progEligible,
+                  roundingKg: template.loadStepKg,
+                  progEligible: template.progressionEligibility !== "NO",
                   orderIndex: nextOrder,
                   setPrescriptions: [],
                 },
@@ -307,26 +297,14 @@ export default function BlockBuilderPage() {
           </section>
 
           <aside className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 lg:sticky lg:top-4 lg:h-fit">
-            <h2 className="mb-1 font-medium">Exercise library</h2>
-            <p className="mb-3 text-xs text-slate-400">Add exercises into the selected session.</p>
+            <h2 className="mb-1 font-medium">Add exercise</h2>
+            <p className="mb-3 text-xs text-slate-400">Search the athlete&apos;s live library or create an exercise inline.</p>
             {!selectedSessionId && <p className="text-sm text-amber-300">Select a session first.</p>}
-            <div className="max-h-[70vh] space-y-2 overflow-auto pr-1">
-              {exerciseLibrary.map((template) => (
-                <button
-                  key={template.id}
-                  type="button"
-                  disabled={!selectedSessionId || activeWeek !== 1}
-                  onClick={() => addExerciseToSession(selectedSessionId, template)}
-                  className="w-full rounded-lg border border-slate-800 px-3 py-2 text-left hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <p className="text-sm font-medium">{template.name}</p>
-                  <p className="text-xs text-slate-500">{template.mainLift} · {template.category}</p>
-                </button>
-              ))}
-            </div>
+            <button type="button" disabled={!selectedSessionId || activeWeek !== 1} onClick={()=>setPickerOpen(true)} className="min-h-12 w-full rounded-xl bg-cyan-400 px-4 font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-40">Open exercise picker</button>
           </aside>
         </div>
       </div>
+      {pickerOpen && <ExerciseDialog label="Exercise picker" onClose={()=>setPickerOpen(false)}><ExercisePicker athleteId={block.athleteId} onClose={()=>setPickerOpen(false)} onSelect={(_,exercise)=>{addExerciseToSession(selectedSessionId,exercise);setPickerOpen(false);}}/></ExerciseDialog>}
     </main>
   );
 }
