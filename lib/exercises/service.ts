@@ -3,7 +3,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { ExerciseLibraryError } from "@/lib/exercises/errors";
 import { normalizeExerciseName } from "@/lib/exercises/normalize-name";
 import { ExerciseRepository } from "@/lib/exercises/repository";
-import type { ExerciseInput, ExerciseListQuery } from "@/lib/exercises/schema";
+import type { ExerciseInput, ExerciseListQuery, ExerciseUpdateInput } from "@/lib/exercises/schema";
 import { seedAthleteExercises } from "@/lib/exercises/seed";
 
 function translateDatabaseError(error: unknown): never {
@@ -52,8 +52,14 @@ export class ExerciseService {
     }
   }
 
-  async update(athleteId: string, exerciseId: string, input: ExerciseInput) {
-    await this.get(athleteId, exerciseId);
+  async update(athleteId: string, exerciseId: string, input: ExerciseUpdateInput) {
+    const existing = await this.get(athleteId, exerciseId);
+    if (existing.movementPattern !== null && input.movementPattern === null) {
+      throw new ExerciseLibraryError("Movement pattern cannot be cleared once it is known.", "INVALID_INPUT");
+    }
+    if (existing.equipment !== null && input.equipment === null) {
+      throw new ExerciseLibraryError("Equipment cannot be cleared once it is known.", "INVALID_INPUT");
+    }
     try {
       return await this.repository.update(athleteId, exerciseId, input, normalizeExerciseName(input.name));
     } catch (error) {

@@ -2,8 +2,8 @@
 
 import { useId, useState, type FormEvent } from "react";
 
-import { readApiError, validateExercise, type ExerciseFieldErrors, type ExerciseRecord } from "@/lib/exercises/client";
-import type { ExerciseInput } from "@/lib/exercises/schema";
+import { saveExercise, validateExercise, type ExerciseFieldErrors, type ExerciseRecord } from "@/lib/exercises/client";
+import type { ExerciseInput, ExerciseUpdateInput } from "@/lib/exercises/schema";
 
 const initialExercise: ExerciseInput = {
   name: "", mainLift: "ACCESSORY", category: "Strength Accessory", movementPattern: "", equipment: "",
@@ -17,31 +17,30 @@ const fieldClass = "mt-1 min-h-11 w-full rounded-xl border border-slate-700 bg-s
 
 export function ExerciseForm({ exercise, athleteId, onSaved, onCancel }: { exercise?: ExerciseRecord; athleteId?: string; onSaved: (exercise: ExerciseRecord) => void; onCancel: () => void }) {
   const id = useId();
-  const [value, setValue] = useState<ExerciseInput>(() => exercise ? {
-    name: exercise.name, mainLift: exercise.mainLift, category: exercise.category, movementPattern: exercise.movementPattern ?? "",
-    equipment: exercise.equipment ?? "", capability: exercise.capability, defaultMode: exercise.defaultMode, active: exercise.active,
+  const [value, setValue] = useState<ExerciseInput | ExerciseUpdateInput>(() => exercise ? {
+    name: exercise.name, mainLift: exercise.mainLift, category: exercise.category, movementPattern: exercise.movementPattern,
+    equipment: exercise.equipment, capability: exercise.capability, defaultMode: exercise.defaultMode, active: exercise.active,
     parentLift: exercise.parentLift, progressionGroup: exercise.progressionGroup, progressionEligibility: exercise.progressionEligibility,
     loadStepKg: exercise.loadStepKg, tier: exercise.tier, restText: exercise.restText, seedRatio: exercise.seedRatio, notes: exercise.notes,
   } : initialExercise);
   const [errors, setErrors] = useState<ExerciseFieldErrors>({});
   const [requestError, setRequestError] = useState("");
   const [saving, setSaving] = useState(false);
-  const set = <K extends keyof ExerciseInput>(key: K, next: ExerciseInput[K]) => setValue((current) => ({ ...current, [key]: next }));
+  const set = <K extends keyof ExerciseUpdateInput>(key: K, next: ExerciseUpdateInput[K]) => setValue((current) => ({ ...current, [key]: next }));
   const error = (key: keyof ExerciseInput) => errors[key] ? <p id={`${id}-${key}-error`} className="mt-1 text-sm text-rose-300">{errors[key]}</p> : null;
 
   async function submit(event: FormEvent) {
     event.preventDefault(); setRequestError("");
-    const result = validateExercise(value); setErrors(result.errors);
+    const result = validateExercise(value, !!exercise); setErrors(result.errors);
     if (!result.data) return;
     setSaving(true);
-    const suffix = athleteId ? `?athleteId=${encodeURIComponent(athleteId)}` : "";
     try {
-      const response = await fetch(exercise ? `/api/exercises/${exercise.id}${suffix}` : `/api/exercises${suffix}`, {
-        method: exercise ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(result.data),
-      });
-      if (!response.ok) { const apiError = await readApiError(response); setRequestError(apiError.message); setErrors(apiError.fieldErrors); return; }
-      onSaved(await response.json() as ExerciseRecord);
-    } catch { setRequestError("Network error. Check your connection and try again."); }
+      onSaved(await saveExercise(result.data, athleteId, exercise?.id));
+    } catch (error) {
+      const apiError = error as { message?: string; fieldErrors?: ExerciseFieldErrors };
+      setRequestError(apiError.message || "Network error. Check your connection and try again.");
+      if (apiError.fieldErrors) setErrors(apiError.fieldErrors);
+    }
     finally { setSaving(false); }
   }
 
@@ -51,8 +50,8 @@ export function ExerciseForm({ exercise, athleteId, onSaved, onCancel }: { exerc
     <div className="grid gap-4 sm:grid-cols-2">
       <div><label htmlFor={`${id}-mainLift`} className="text-sm font-medium">Main lift / family *</label><select id={`${id}-mainLift`} value={value.mainLift} onChange={(e) => set("mainLift", e.target.value as ExerciseInput["mainLift"])} className={fieldClass}>{["SQUAT","BENCH","DEADLIFT","ACCESSORY"].map(x=><option key={x} value={x}>{x[0]+x.slice(1).toLowerCase()}</option>)}</select></div>
       <div><label htmlFor={`${id}-category`} className="text-sm font-medium">Category *</label><input id={`${id}-category`} value={value.category} onChange={(e)=>set("category",e.target.value)} className={fieldClass}/>{error("category")}</div>
-      <div><label htmlFor={`${id}-movement`} className="text-sm font-medium">Movement pattern *</label><input id={`${id}-movement`} value={value.movementPattern} onChange={(e)=>set("movementPattern",e.target.value)} className={fieldClass}/>{error("movementPattern")}</div>
-      <div><label htmlFor={`${id}-equipment`} className="text-sm font-medium">Equipment *</label><input id={`${id}-equipment`} value={value.equipment} onChange={(e)=>set("equipment",e.target.value)} className={fieldClass}/>{error("equipment")}</div>
+      <div><label htmlFor={`${id}-movement`} className="text-sm font-medium">Movement pattern {exercise?.movementPattern === null ? "(unknown)" : "*"}</label><input id={`${id}-movement`} placeholder={exercise?.movementPattern === null ? "Unknown in legacy data" : undefined} value={value.movementPattern ?? ""} onChange={(e)=>set("movementPattern",e.target.value || (exercise?.movementPattern === null ? null : ""))} className={fieldClass}/>{exercise?.movementPattern === null && value.movementPattern === null && <p className="mt-1 text-xs text-amber-300">Unknown in the imported record. You may leave this unchanged.</p>}{error("movementPattern")}</div>
+      <div><label htmlFor={`${id}-equipment`} className="text-sm font-medium">Equipment {exercise?.equipment === null ? "(unknown)" : "*"}</label><input id={`${id}-equipment`} placeholder={exercise?.equipment === null ? "Unknown in legacy data" : undefined} value={value.equipment ?? ""} onChange={(e)=>set("equipment",e.target.value || (exercise?.equipment === null ? null : ""))} className={fieldClass}/>{exercise?.equipment === null && value.equipment === null && <p className="mt-1 text-xs text-amber-300">Unknown in the imported record. You may leave this unchanged.</p>}{error("equipment")}</div>
       <div><label htmlFor={`${id}-capability`} className="text-sm font-medium">Capability *</label><select id={`${id}-capability`} value={value.capability} onChange={(e)=>set("capability",e.target.value as ExerciseInput["capability"])} className={fieldClass}>{Object.entries(labels).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></div>
       <div><label htmlFor={`${id}-mode`} className="text-sm font-medium">Default mode *</label><select id={`${id}-mode`} value={value.defaultMode} onChange={(e)=>set("defaultMode",e.target.value as ExerciseInput["defaultMode"])} className={fieldClass}>{Object.entries(modeLabels).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select>{error("defaultMode")}</div>
     </div>
