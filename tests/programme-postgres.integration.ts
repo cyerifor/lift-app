@@ -1,15 +1,189 @@
-import assert from "node:assert/strict"; import test from "node:test";
+import assert from "node:assert/strict";
+import test from "node:test";
+
 const databaseUrl = process.env.TEST_DATABASE_URL;
-test("programme ownership, stable slots, exact planned sets, and tenant isolation", { skip: !databaseUrl, timeout: 40_000 }, async () => {
- process.env.DATABASE_URL=databaseUrl; process.env.DIRECT_URL=databaseUrl; const [{ db }, { ProgrammeService }] = await Promise.all([import("../lib/db.ts"), import("../lib/programme/service.ts")]); const suffix=`${Date.now()}-${Math.random()}`; const users:string[]=[];
- const mkAthlete=async(name:string,coachId?:string)=>{const user=await db.user.create({data:{email:`${name}-${suffix}@test.dev`,name,role:"ATHLETE",settings:{create:{trainingDays:["MONDAY","WEDNESDAY","FRIDAY"],sessionsPerWeek:3}},athleteProfile:{create:{coachId}}},include:{settings:true,athleteProfile:true,coachProfile:true}});users.push(user.id);return user;};
- const coach=await db.user.create({data:{email:`coach-${suffix}@test.dev`,name:"Coach",role:"COACH",coachProfile:{create:{}}},include:{settings:true,athleteProfile:true,coachProfile:true}});users.push(coach.id); const unrelatedCoach=await db.user.create({data:{email:`other-coach-${suffix}@test.dev`,name:"Other",role:"COACH",coachProfile:{create:{}}},include:{settings:true,athleteProfile:true,coachProfile:true}});users.push(unrelatedCoach.id);
- try { const self=await mkAthlete("self"); const managed=await mkAthlete("managed",coach.coachProfile!.id); const unrelated=await mkAthlete("unrelated"); const service=new ProgrammeService(db); const blockInput={name:"Foundation",startDate:new Date("2026-10-02T00:00:00Z"),weekCount:2,sessionsPerWeek:3,applyProgression:false};
-  const selfBlock=await service.createDraftBlock(self,{...blockInput,athleteId:self.athleteProfile!.id}); assert.equal(selfBlock.coachId,null); assert.equal(selfBlock.weeks.flatMap(w=>w.sessions).length,6); assert.equal(selfBlock.weeks[0].sessions[0].scheduledAt!.toISOString(),blockInput.startDate.toISOString());
-  const managedBlock=await service.createDraftBlock(coach,{...blockInput,athleteId:managed.athleteProfile!.id}); assert.equal(managedBlock.coachId,coach.coachProfile!.id); await assert.rejects(service.getBlock(unrelatedCoach,managedBlock.id),/not found/); await assert.rejects(service.getBlock(unrelated,selfBlock.id),/not found/);
-  const exercise=await db.exercise.create({data:{athleteId:self.athleteProfile!.id,name:"SSB Squat",normalizedName:"ssb squat",mainLift:"SQUAT",category:"Strength",capability:"LOADED_REPS",defaultMode:"DOUBLE_PROGRESSION"}}); const otherExercise=await db.exercise.create({data:{athleteId:unrelated.athleteProfile!.id,name:"Other Squat",normalizedName:"other squat",mainLift:"SQUAT",category:"Strength",capability:"LOADED_REPS",defaultMode:"REP_TARGET"}});
-  const session=selfBlock.weeks[0].sessions[0]; const prescription={exerciseId:exercise.id,setType:"Top Set",prescriptionMode:"RPE" as const,repScheme:"FIXED" as const,repMin:4,repMax:4,rpeMin:7.5,rpeMax:8,setCount:3}; const first=await service.addExerciseSlot(self,session.id,prescription); const second=await service.addExerciseSlot(self,session.id,{...prescription,setType:"Back-off",repMin:8,repMax:8,setCount:1}); assert.notEqual(first.id,second.id); assert.equal(first.setPrescriptions.length,3); assert.equal(new Set(first.setPrescriptions.map(s=>s.id)).size,3);
-  await service.reorderExerciseSlots(self,session.id,[second.id,first.id]); const reordered=await service.getBlock(self,selfBlock.id); assert.deepEqual(reordered.weeks[0].sessions[0].exercises.map(s=>s.id),[second.id,first.id]); const updated=await service.updateExerciseSlot(self,first.id,{...prescription,setCount:2}); assert.equal(updated.id,first.id); assert.equal(updated.setPrescriptions.length,2); await assert.rejects(service.addExerciseSlot(self,session.id,{...prescription,exerciseId:otherExercise.id}),/not owned/);
-  await db.exercise.update({where:{id:exercise.id},data:{active:false}}); const resolved=await service.getBlock(self,selfBlock.id); assert.equal(resolved.weeks[0].sessions[0].exercises.find(s=>s.id===first.id)?.exercise?.id,exercise.id); assert.equal(await service.listAthleteBlocks(self,unrelated.athleteProfile!.id).then(()=>false,()=>true),true);
- } finally { await db.user.deleteMany({where:{id:{in:users}}}); await db.$disconnect(); }
-});
+
+test(
+  "programme ownership, stable slots, exact planned sets, and tenant isolation",
+  { skip: !databaseUrl, timeout: 40_000 },
+  async () => {
+    process.env.DATABASE_URL = databaseUrl;
+    process.env.DIRECT_URL = databaseUrl;
+
+    const [{ db }, { ProgrammeService }] = await Promise.all([
+      import("../lib/db.ts"),
+      import("../lib/programme/service.ts"),
+    ]);
+
+    const suffix = `${Date.now()}-${Math.random()}`;
+    const users: string[] = [];
+
+    const mkAthlete = async (name: string, coachId?: string) => {
+      const user = await db.user.create({
+        data: {
+          email: `${name}-${suffix}@test.dev`,
+          name,
+          role: "ATHLETE",
+          settings: {
+            create: {
+              trainingDays: ["MONDAY", "WEDNESDAY", "FRIDAY"],
+              sessionsPerWeek: 3,
+            },
+          },
+          athleteProfile: { create: { coachId } },
+        },
+        include: { settings: true, athleteProfile: true, coachProfile: true },
+      });
+      users.push(user.id);
+      return user;
+    };
+
+    const coach = await db.user.create({
+      data: {
+        email: `coach-${suffix}@test.dev`,
+        name: "Coach",
+        role: "COACH",
+        coachProfile: { create: {} },
+      },
+      include: { settings: true, athleteProfile: true, coachProfile: true },
+    });
+    users.push(coach.id);
+
+    const unrelatedCoach = await db.user.create({
+      data: {
+        email: `other-coach-${suffix}@test.dev`,
+        name: "Other",
+        role: "COACH",
+        coachProfile: { create: {} },
+      },
+      include: { settings: true, athleteProfile: true, coachProfile: true },
+    });
+    users.push(unrelatedCoach.id);
+
+    try {
+      const self = await mkAthlete("self");
+      const managed = await mkAthlete("managed", coach.coachProfile!.id);
+      const unrelated = await mkAthlete("unrelated");
+      const service = new ProgrammeService(db);
+      const blockInput = {
+        name: "Foundation",
+        startDate: new Date("2026-10-02T00:00:00Z"),
+        weekCount: 2,
+        sessionsPerWeek: 3,
+        applyProgression: false,
+      };
+
+      const selfBlock = await service.createDraftBlock(self, {
+        ...blockInput,
+        athleteId: self.athleteProfile!.id,
+      });
+      assert.equal(selfBlock.coachId, null);
+      assert.equal(selfBlock.weeks.flatMap((week) => week.sessions).length, 6);
+      assert.equal(
+        selfBlock.weeks[0].sessions[0].scheduledAt!.toISOString(),
+        blockInput.startDate.toISOString(),
+      );
+
+      const managedBlock = await service.createDraftBlock(coach, {
+        ...blockInput,
+        athleteId: managed.athleteProfile!.id,
+      });
+      assert.equal(managedBlock.coachId, coach.coachProfile!.id);
+      await assert.rejects(service.getBlock(unrelatedCoach, managedBlock.id), /not found/);
+      await assert.rejects(service.getBlock(unrelated, selfBlock.id), /not found/);
+
+      const exercise = await db.exercise.create({
+        data: {
+          athleteId: self.athleteProfile!.id,
+          name: "SSB Squat",
+          normalizedName: "ssb squat",
+          mainLift: "SQUAT",
+          category: "Strength",
+          capability: "LOADED_REPS",
+          defaultMode: "DOUBLE_PROGRESSION",
+        },
+      });
+      const otherExercise = await db.exercise.create({
+        data: {
+          athleteId: unrelated.athleteProfile!.id,
+          name: "Other Squat",
+          normalizedName: "other squat",
+          mainLift: "SQUAT",
+          category: "Strength",
+          capability: "LOADED_REPS",
+          defaultMode: "REP_TARGET",
+        },
+      });
+
+      const session = selfBlock.weeks[0].sessions[0];
+      const prescription = {
+        exerciseId: exercise.id,
+        setType: "Top Set",
+        prescriptionMode: "RPE" as const,
+        repScheme: "FIXED" as const,
+        repMin: 4,
+        repMax: 4,
+        rpeMin: 7.5,
+        rpeMax: 8,
+        setCount: 3,
+      };
+
+      const first = await service.addExerciseSlot(self, session.id, prescription);
+      const second = await service.addExerciseSlot(self, session.id, {
+        ...prescription,
+        setType: "Back-off",
+        repMin: 8,
+        repMax: 8,
+        setCount: 1,
+      });
+      assert.notEqual(first.id, second.id);
+      assert.equal(first.setPrescriptions.length, 3);
+      assert.equal(new Set(first.setPrescriptions.map((set) => set.id)).size, 3);
+
+      await service.reorderExerciseSlots(self, session.id, [second.id, first.id]);
+      const reordered = await service.getBlock(self, selfBlock.id);
+      assert.deepEqual(
+        reordered.weeks[0].sessions[0].exercises.map((slot) => slot.id),
+        [second.id, first.id],
+      );
+
+      const updated = await service.updateExerciseSlot(self, first.id, {
+        ...prescription,
+        setCount: 2,
+      });
+      assert.equal(updated.id, first.id);
+      assert.equal(updated.setPrescriptions.length, 2);
+
+      await assert.rejects(
+        service.addExerciseSlot(self, session.id, {
+          ...prescription,
+          exerciseId: otherExercise.id,
+        }),
+        /not owned/,
+      );
+
+      await db.exercise.update({ where: { id: exercise.id }, data: { active: false } });
+      const resolved = await service.getBlock(self, selfBlock.id);
+      assert.equal(
+        resolved.weeks[0].sessions[0].exercises.find((slot) => slot.id === first.id)?.exercise?.id,
+        exercise.id,
+      );
+      assert.equal(
+        await service
+          .listAthleteBlocks(self, unrelated.athleteProfile!.id)
+          .then(() => false, () => true),
+        true,
+      );
+    } finally {
+      const athleteRows = await db.athlete.findMany({
+        where: { userId: { in: users } },
+        select: { id: true },
+      });
+      await db.block.deleteMany({
+        where: { athleteId: { in: athleteRows.map((athlete) => athlete.id) } },
+      });
+      await db.user.deleteMany({ where: { id: { in: users } } });
+      await db.$disconnect();
+    }
+  },
+);
