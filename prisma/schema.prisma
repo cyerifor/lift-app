@@ -32,6 +32,28 @@ enum SessionStatus {
   MISSED
 }
 
+enum PrescriptionMode {
+  PERCENT_E1RM
+  PERCENT_RPE
+  RPE
+  DOUBLE_PROGRESSION
+  FIXED_LOAD
+  REP_TARGET
+  BODYWEIGHT
+  TIME
+  MANUAL
+}
+
+enum RepScheme {
+  FIXED
+  RANGE
+  AMRAP
+}
+
+enum PlannedSetStatus {
+  PLANNED
+}
+
 enum MediaType {
   IMAGE
   VIDEO
@@ -233,24 +255,29 @@ model Athlete {
 }
 
 model Block {
-  id              String      @id @default(cuid())
-  coachId         String
-  athleteId       String
-  title           String
-  blockNumber     Int         @default(1)
-  phase           String?     @default("Accumulation")
-  weekCount       Int         @default(6)
-  sessionsPerWeek Int         @default(4)
-  config          String?
-  goal            String?
-  status          BlockStatus @default(DRAFT)
-  startDate       DateTime
-  endDate         DateTime
-  notes           String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id               String      @id @default(cuid())
+  coachId          String?
+  athleteId        String
+  title            String
+  blockNumber      Int         @default(1)
+  phase            String?     @default("Accumulation")
+  weekCount        Int         @default(6)
+  sessionsPerWeek  Int         @default(4)
+  config           String?
+  goal             String?
+  status           BlockStatus @default(DRAFT)
+  startDate        DateTime
+  endDate          DateTime
+  notes            String?
+  deloadType       String?
+  intensityTrend   String?
+  volumeTrend      String?
+  applyProgression Boolean     @default(false)
+  frozenAt         DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 
-  coach     Coach       @relation(fields: [coachId], references: [id], onDelete: Restrict)
+  coach     Coach?      @relation(fields: [coachId], references: [id], onDelete: SetNull)
   athlete   Athlete     @relation(fields: [athleteId], references: [id], onDelete: Restrict)
   weeks     Week[]
   feedbacks Feedback[]
@@ -282,6 +309,8 @@ model Session {
   id            String        @id @default(cuid())
   weekId        String
   sessionNumber Int           @default(1)
+  sessionCode   String        @default("S1")
+  trainingDay   String?
   dayOfWeek     String?
   title         String
   scheduledAt   DateTime?
@@ -303,30 +332,51 @@ model Session {
 }
 
 model ExerciseSlot {
-  id               String   @id @default(cuid())
-  sessionId        String
-  exerciseId       String?  @map("exerciseTemplateId")
-  name             String
-  exerciseType     String?  @default("Accessory")
-  mainLift         String?  @default("accessory")
-  category         String?
-  progressionGroup String?  @default("accessory")
-  targetSets       Int?     @default(3)
-  repsDisplay      String?
-  rpeDisplay       String?
-  weeklyPercent    Float?
-  roundingKg       Float?   @default(2.5)
-  progEligible     Boolean  @default(true)
-  orderIndex       Int
-  instructions     String?
-  tempo            String?
-  restSec          Int?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                 String              @id @default(cuid())
+  sessionId          String
+  exerciseId         String?             @map("exerciseTemplateId")
+  name               String
+  exerciseType       String?             @default("Accessory")
+  mainLift           String?             @default("accessory")
+  category           String?
+  progressionGroup   String?             @default("accessory")
+  targetSets         Int?                @default(3)
+  setType            String              @default("Volume")
+  prescriptionMode   PrescriptionMode    @default(MANUAL)
+  repScheme          RepScheme?
+  repMin             Int?
+  repMax             Int?
+  rpeMin             Float?
+  rpeMax             Float?
+  rpeCap             Float?
+  pctMin             Float?
+  pctMax             Float?
+  setCount           Int                 @default(1)
+  fixedLoadKg        Float?
+  capabilityOverride ExerciseCapability?
+  notes              String?
+  referenceE1rmKg    Float?
+  referenceSource    String?
+  variationRatioUsed Float?
+  suggestedLoadMinKg Float?
+  suggestedLoadMaxKg Float?
+  suggestedLoadKg    Float?
+  loadReason         String?
+  repsDisplay        String?
+  rpeDisplay         String?
+  weeklyPercent      Float?
+  roundingKg         Float?              @default(2.5)
+  progEligible       Boolean             @default(true)
+  orderIndex         Int
+  instructions       String?
+  tempo              String?
+  restSec            Int?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
-  session          Session           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  exercise         Exercise?         @relation(fields: [exerciseId], references: [id], onDelete: SetNull)
-  setPrescriptions SetPrescription[]
+  session          Session      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exercise         Exercise?    @relation(fields: [exerciseId], references: [id], onDelete: SetNull)
+  setPrescriptions PlannedSet[]
   setLogs          SetLog[]
 
   @@unique([sessionId, orderIndex])
@@ -335,8 +385,8 @@ model ExerciseSlot {
   @@map("Exercise")
 }
 
-model SetPrescription {
-  id            String   @id @default(cuid())
+model PlannedSet {
+  id            String           @id @default(cuid())
   exerciseId    String
   setNumber     Int
   repsDisplay   String?
@@ -348,13 +398,15 @@ model SetPrescription {
   targetLoadKg  Float?
   targetPercent Float?
   notes         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  status        PlannedSetStatus @default(PLANNED)
 
   exercise ExerciseSlot @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
 
   @@unique([exerciseId, setNumber])
   @@index([exerciseId])
+  @@map("SetPrescription")
 }
 
 model Exercise {

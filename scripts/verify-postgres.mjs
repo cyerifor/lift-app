@@ -30,4 +30,5 @@ run(process.execPath, [
   "tests/exercise-api-postgres.integration.ts",
   "tests/exercise-postgres.integration.ts",
   "tests/athlete-settings-postgres.integration.ts",
+  "tests/programme-postgres.integration.ts",
 ]);
