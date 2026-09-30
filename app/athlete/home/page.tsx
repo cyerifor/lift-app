@@ -85,7 +85,7 @@ export default function AthleteHomePage() {
             <h1 className="text-2xl font-semibold">Athlete Home</h1>
             <p className="text-sm text-slate-400">Track active block progress and launch your next session.</p>
           </div>
-          <div className="flex gap-2"><Link href="/exercises" className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium hover:bg-slate-800">Exercise library</Link><button onClick={() => void loadActiveBlock()} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium hover:bg-blue-500">Refresh</button></div>
+          <div className="flex flex-wrap gap-2"><Link href="/athlete/settings" className="rounded-lg border border-cyan-700 px-4 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-950">Athlete setup</Link><Link href="/exercises" className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium hover:bg-slate-800">Exercise library</Link><button onClick={() => void loadActiveBlock()} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium hover:bg-blue-500">Refresh</button></div>
         </header>
 
         {error && <div className="rounded-lg border border-red-900 bg-red-950/30 p-3 text-sm text-red-300">{error}</div>}
